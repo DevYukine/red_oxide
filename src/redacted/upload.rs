@@ -12,7 +12,7 @@ pub struct TorrentUploadData {
 	pub r#type: i64,
 	pub releasetype: i64,
 	pub artists: Vec<String>,
-	pub remaster_year: Option<i64>,
+	pub remaster_year: i64,
 	pub remaster_title: String,
 	pub remaster_record_label: String,
 	pub remaster_catalogue_number: String,
@@ -44,11 +44,8 @@ impl Into<Form> for TorrentUploadData {
 			.text("media", self.media)
 			.text("release_desc", self.release_desc)
 			.text("groupid", self.groupid.to_string())
-			.text("tags", self.tags.join(","));
-
-		if let Some(remaster_year) = self.remaster_year {
-			form = form.text("remaster_year", remaster_year.to_string());
-		}
+			.text("tags", self.tags.join(","))
+			.text("remaster_year", self.remaster_year.to_string());
 
 		let index = 0;
 		for artist in self.artists {

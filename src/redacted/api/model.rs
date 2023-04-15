@@ -210,7 +210,7 @@ pub struct Torrent {
     pub format: String,
     pub encoding: String,
     pub remastered: bool,
-    pub remaster_year: Option<i64>,
+    pub remaster_year: i64,
     pub remaster_title: String,
     pub remaster_record_label: String,
     pub remaster_catalogue_number: String,

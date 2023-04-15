@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use clap::{arg, Parser, Subcommand};
 use console::Term;
+use dialoguer::Confirm;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -297,7 +298,7 @@ async fn handle_url(
         group.music_info.artists[0].name.clone()
     };
 
-    let mut year = torrent.remaster_year.unwrap_or(group.year);
+    let mut year = torrent.remaster_year;
 
     // Fixes edge case where remaster year is 0 (likely unintentional)
     if year == 0 {
@@ -460,21 +461,24 @@ async fn handle_url(
 
         let torrent_file_data = tokio::fs::read(&torrent_path).await?;
 
+        let perma_link = perma_link(group_id, torrent_id);
+        let description = create_description(perma_link.clone(), command.clone());
+
+        let format_red = match format {
+            ReleaseType::Flac24 => Format::Flac,
+            ReleaseType::Flac => Format::Flac,
+            ReleaseType::Mp3320 => Format::Mp3,
+            ReleaseType::Mp3V0 => Format::Mp3,
+        };
+
+        let bitrate = match format {
+            ReleaseType::Flac24 => "24bit Lossless".to_string(),
+            ReleaseType::Flac => "Lossless".to_string(),
+            ReleaseType::Mp3320 => "320".to_string(),
+            ReleaseType::Mp3V0 => "V0 (VBR)".to_string(),
+        };
+
         if !cmd.dry_run && !cmd.manual {
-            let format_red = match format {
-                ReleaseType::Flac24 => Format::Flac,
-                ReleaseType::Flac => Format::Flac,
-                ReleaseType::Mp3320 => Format::Mp3,
-                ReleaseType::Mp3V0 => Format::Mp3,
-            };
-
-            let bitrate = match format {
-                ReleaseType::Flac24 => "24bit Lossless".to_string(),
-                ReleaseType::Flac => "Lossless".to_string(),
-                ReleaseType::Mp3320 => "320".to_string(),
-                ReleaseType::Mp3V0 => "V0 (VBR)".to_string(),
-            };
-
             let upload_data = TorrentUploadData {
                 torrent: torrent_file_data,
                 torrent_name: torrent_path.file_name().unwrap().to_str().unwrap().to_string(),
@@ -489,14 +493,55 @@ async fn handle_url(
                 remaster_catalogue_number: torrent.remaster_catalogue_number.clone(),
                 scene: torrent.scene,
                 format: format_red,
-                bitrate,
+                bitrate: bitrate.clone(),
                 media: torrent.media.clone(),
-                release_desc: create_description(perma_link(group_id, torrent_id), command.clone()),
+                release_desc: description.clone(),
                 groupid: group.id as u64,
                 tags: group.tags.clone(),
             };
 
             api.upload_torrent(upload_data).await?;
+        }
+
+        if cmd.move_transcode_to_content {
+            tokio::fs::rename(&path, &cmd.content_directory.join(path.file_name().unwrap())).await?;
+
+            term.write_line(&format!(
+                "{} Moved transcoded release to content directory",
+                SUCCESS,
+            ))?;
+        }
+
+        if cmd.manual {
+            term.write_line("[⏸️] Manual mode enabled, skipping automatic upload")?;
+
+            let scene = if torrent.scene { "Yes" } else {"No"};
+            let format = match format {
+                ReleaseType::Flac24 => "FLAC",
+                ReleaseType::Flac => "FLAC",
+                ReleaseType::Mp3320 => "MP3",
+                ReleaseType::Mp3V0 => "MP3",
+            };
+
+            term.write_line(&*("Link: ".to_owned() + &*perma_link))?;
+            term.write_line(&*("Name: ".to_owned() + &*group.name.clone()))?;
+            term.write_line(&*("Artist(s): ".to_owned() + &group.music_info.artists.iter().map(|a| a.name.clone()).collect::<Vec<String>>().join(", ")))?;
+            term.write_line(&*("Edition Year: ".to_owned() + &*torrent.remaster_year.to_string()))?;
+            term.write_line(&*("Edition Title: ".to_owned() + &torrent.remaster_title))?;
+            term.write_line(&*("Record Label: ".to_owned() + &torrent.remaster_record_label))?;
+            term.write_line(&*("Catalogue Number: ".to_owned() + &torrent.remaster_catalogue_number))?;
+            term.write_line(&*("Scene: ".to_owned() + scene))?;
+            term.write_line(&*("Format: ".to_owned() + format))?;
+            term.write_line(&*("Bitrate: ".to_owned() + &bitrate))?;
+            term.write_line(&*("Media: ".to_owned() + &torrent.media))?;
+            term.write_line("Release Description:")?;
+            term.write_line(&description)?;
+
+            let mut prompt = Confirm::new();
+
+            prompt.with_prompt("Confirm once you are done uploading...").default(true);
+
+            prompt.interact()?;
         }
     }
 
