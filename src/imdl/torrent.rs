@@ -16,8 +16,8 @@ pub async fn create_torrent(
     cmd.arg("-P");
     cmd.arg("-a");
     cmd.arg(announce_url);
-    cmd.arg("-c");
-    cmd.arg("Created with red_oxide");
+    cmd.arg("-s");
+    cmd.arg("RED");
     cmd.arg("-o");
     cmd.arg(torrent_path.to_str().unwrap());
 
