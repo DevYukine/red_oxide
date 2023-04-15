@@ -1,3 +1,4 @@
+use std::str;
 use std::time::Duration;
 
 use anyhow::Error;
@@ -12,8 +13,10 @@ use crate::redacted::api::error::RedactedApiError;
 use crate::redacted::api::model::{
     ApiResponse, ApiResponseReceived, IndexResponse, TorrentGroupResponse, TorrentResponse,
 };
+use crate::redacted::upload::TorrentUploadData;
 
 pub struct RedactedApi {
+    client: Client,
     service: RateLimit<Client>,
 }
 
@@ -37,15 +40,15 @@ impl RedactedApi {
 
         let service = tower::ServiceBuilder::new()
             .rate_limit(10, Duration::from_secs(10))
-            .service(client);
+            .service(client.clone());
 
-        Self { service }
+        Self { client, service }
     }
 
     pub async fn index(&mut self) -> anyhow::Result<ApiResponse<IndexResponse>> {
         let req = Request::new(
             Method::POST,
-            Url::parse(&(API_URL.to_owned() + "index")).unwrap(),
+            Url::parse(&(API_URL.to_owned() + "index"))?,
         );
 
         let res = self.service.ready().await?.call(req).await?;
@@ -61,8 +64,7 @@ impl RedactedApi {
     ) -> anyhow::Result<ApiResponse<TorrentResponse>> {
         let req = Request::new(
             Method::GET,
-            Url::parse(&(API_URL.to_owned() + &format!("torrent&id={}", torrent_id.to_string())))
-                .unwrap(),
+            Url::parse(&(API_URL.to_owned() + &format!("torrent&id={}", torrent_id.to_string())))?,
         );
 
         let res = self.service.ready().await?.call(req).await?;
@@ -80,8 +82,7 @@ impl RedactedApi {
             Method::GET,
             Url::parse(
                 &(API_URL.to_owned() + &format!("torrentgroup&id={}", group_id.to_string())),
-            )
-            .unwrap(),
+            )?,
         );
 
         let res = self.service.ready().await?.call(req).await?;
@@ -94,13 +95,26 @@ impl RedactedApi {
     pub async fn download_torrent(&mut self, torrent_id: i64) -> anyhow::Result<Vec<u8>> {
         let req = Request::new(
             Method::GET,
-            Url::parse(&(API_URL.to_owned() + &format!("download&id={}", torrent_id.to_string())))
-                .unwrap(),
+            Url::parse(&(API_URL.to_owned() + &format!("download&id={}", torrent_id.to_string())))?,
         );
 
         let res = self.service.ready().await?.call(req).await?;
 
         Ok(res.bytes().await?.to_vec())
+    }
+
+    pub async fn upload_torrent(&mut self, upload_data: TorrentUploadData) -> anyhow::Result<()> {
+        let form = upload_data.into();
+
+        let req = self.client.request(Method::POST, Url::parse(&(API_URL.to_owned() + "upload"))?).multipart(form).build()?;
+
+        let res = self.service.ready().await?.call(req).await?;
+
+        if !res.status().is_success() {
+            return Err(Error::from(RedactedApiError::UploadError(str::from_utf8(&*res.bytes().await?)?.to_string())));
+        }
+
+        Ok(())
     }
 
     async fn handle_status_and_parse_body<T: DeserializeOwned>(

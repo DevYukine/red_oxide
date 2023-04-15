@@ -13,6 +13,7 @@ use strum::IntoEnumIterator;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::task::JoinSet;
+use redacted::util::create_description;
 
 use transcode::transcode::transcode_release;
 
@@ -20,7 +21,9 @@ use crate::config::models::RedOxideConfig;
 use crate::fs::util::count_files_with_extension;
 use crate::redacted::api::client::RedactedApi;
 use crate::redacted::api::constants::TRACKER_URL;
-use crate::redacted::models::ReleaseType;
+use crate::redacted::models::{Category, Format, ReleaseType};
+use crate::redacted::upload::TorrentUploadData;
+use crate::redacted::util::perma_link;
 use crate::transcode::util::copy_other_allowed_files;
 
 mod config;
@@ -404,7 +407,7 @@ async fn handle_url(
         let mut output_dir = cmd.transcode_directory.clone();
         let format = format.clone();
         join_set.spawn(tokio::spawn(async move {
-            let folder_path = transcode_release(
+            let (folder_path, command) = transcode_release(
                 &flac_path_clone,
                 &mut output_dir,
                 transcode_release_name.clone(),
@@ -420,22 +423,22 @@ async fn handle_url(
 
             copy_other_allowed_files(&flac_path_clone, &transcode_folder_path).await?;
 
-            return Ok::<PathBuf, anyhow::Error>(folder_path);
+            return Ok::<(PathBuf, ReleaseType, String), anyhow::Error>((folder_path, format, command));
         }));
     }
 
-    let mut paths = Vec::new();
+    let mut path_format_command_triple = Vec::new();
 
     while let Some(res) = join_set.join_next().await {
         let transcode_folder = res???;
 
-        paths.push(transcode_folder);
+        path_format_command_triple.push(transcode_folder);
     }
 
     m.println(format!("{} Transcoding Done!", SUCCESS))?;
     m.clear()?;
 
-    for path in &paths {
+    for (path, format, command) in &path_format_command_triple {
         let release_name = path.file_name().unwrap().to_str().unwrap();
 
         let torrent_path = cmd
@@ -448,16 +451,54 @@ async fn handle_url(
             format!("{}/{}/announce", TRACKER_URL, passkey),
         )
         .await?;
-    }
 
-    term.write_line(&format!(
-        "{} Created .torrent files for format(s) {}",
-        SUCCESS,
-        transcode_formats
-            .iter()
-            .map(|f| f.to_string())
-            .fold(String::new(), |acc, s| acc + &s + ",")
-    ))?;
+        term.write_line(&format!(
+            "{} Created .torrent files for format {}",
+            SUCCESS,
+            format
+        ))?;
+
+        let torrent_file_data = tokio::fs::read(&torrent_path).await?;
+
+        if !cmd.dry_run && !cmd.manual {
+            let format_red = match format {
+                ReleaseType::Flac24 => Format::Flac,
+                ReleaseType::Flac => Format::Flac,
+                ReleaseType::Mp3320 => Format::Mp3,
+                ReleaseType::Mp3V0 => Format::Mp3,
+            };
+
+            let bitrate = match format {
+                ReleaseType::Flac24 => "24bit Lossless".to_string(),
+                ReleaseType::Flac => "Lossless".to_string(),
+                ReleaseType::Mp3320 => "320".to_string(),
+                ReleaseType::Mp3V0 => "V0 (VBR)".to_string(),
+            };
+
+            let upload_data = TorrentUploadData {
+                torrent: torrent_file_data,
+                torrent_name: torrent_path.file_name().unwrap().to_str().unwrap().to_string(),
+                r#type: group.category_id,
+                releasetype: group.release_type,
+                year: group.year,
+                title: group.name.clone(),
+                artists: group.music_info.artists.iter().map(|a| a.name.clone()).collect(),
+                remaster_year: torrent.remaster_year,
+                remaster_title: torrent.remaster_title.clone(),
+                remaster_record_label: torrent.remaster_record_label.clone(),
+                remaster_catalogue_number: torrent.remaster_catalogue_number.clone(),
+                scene: torrent.scene,
+                format: format_red,
+                bitrate,
+                media: torrent.media.clone(),
+                release_desc: create_description(perma_link(group_id, torrent_id), command.clone()),
+                groupid: group.id as u64,
+                tags: group.tags.clone(),
+            };
+
+            api.upload_torrent(upload_data).await?;
+        }
+    }
 
     Ok(())
 }

@@ -30,7 +30,7 @@ pub async fn transcode_release(
     term: Arc<Term>,
     torrent_id: i64,
     pb: ProgressBar,
-) -> anyhow::Result<PathBuf> {
+) -> anyhow::Result<(PathBuf, String)> {
     let needs_resample = util::is_24_bit_flac(flac_dir).await?;
 
     if format == Flac && !needs_resample {
@@ -62,29 +62,31 @@ pub async fn transcode_release(
         let pb = pb.clone();
         let output_dir = output_dir.clone();
         join_set.spawn(async move {
-            let output_path = transcode(&path, &output_dir, format).await?;
+            let (output_path, command) = transcode(&path, &output_dir, format).await?;
             crate::tags::util::copy_tags(&path, &output_path).await?;
 
             pb.inc(1);
 
-            Ok::<(), anyhow::Error>(())
+            Ok::<String, anyhow::Error>(command)
         });
     }
 
+    let mut command = "".to_string();
+
     while let Some(res) = join_set.join_next().await {
-        res??;
+        command = res??;
     }
 
     pb.finish_with_message(format!("{} transcoding done", format));
 
-    Ok(output_dir.to_owned())
+    Ok((output_dir.to_owned(), command))
 }
 
 pub async fn transcode(
     flac_file_path: &PathBuf,
     output_dir: &PathBuf,
     format: ReleaseType,
-) -> anyhow::Result<PathBuf> {
+) -> anyhow::Result<(PathBuf, String)> {
     let flac_file_cloned = flac_file_path.clone();
     let reader = tokio::task::spawn_blocking(move || FlacReader::open(flac_file_cloned)).await??;
 
@@ -127,6 +129,7 @@ pub async fn transcode(
     let output_file_path_str = output_file_path.to_str().unwrap();
 
     let mut flac_decoder_command;
+    let mut transcoding_commands_str = Vec::new();
 
     if resample {
         flac_decoder_command = Command::new(get_sox_executable());
@@ -144,9 +147,14 @@ pub async fn transcode(
             needed_sample_rate.unwrap().to_string().as_str(),
             "dither",
         ]);
+        transcoding_commands_str.push(format!(
+            "sox input.flac -G -b 16 -t wav - rate -v -L {} dither",
+            needed_sample_rate.unwrap().to_string().as_str()
+        ));
     } else {
         flac_decoder_command = Command::new(get_flac_executable());
         flac_decoder_command.args(&["-dcs", "--", flac_file_path_str]);
+        transcoding_commands_str.push("flac -dcs -- input.flac".to_string());
     }
 
     let mut transcoding_steps = Vec::new();
@@ -164,6 +172,7 @@ pub async fn transcode(
             output_file_path_str,
         ]);
         transcoding_steps.push(cmd);
+        transcoding_commands_str.push("lame -S -V 0 --vbr-new --ignore-tag-errors - output.mp3".to_string());
     } else if format == Mp3320 {
         let mut cmd = Command::new(get_lame_executable());
         cmd.args(&[
@@ -176,10 +185,12 @@ pub async fn transcode(
             output_file_path_str,
         ]);
         transcoding_steps.push(cmd);
+        transcoding_commands_str.push("lame -S -h -b 320 --ignore-tag-errors - output.mp3".to_string());
     } else if format == Flac {
         let mut cmd = Command::new(get_flac_executable());
         cmd.args(&["--best", "-o", output_file_path_str, "-"]);
         transcoding_steps.push(cmd);
+        transcoding_commands_str.push("flac --best -o output.flac -".to_string());
     }
 
     let mut commands = Vec::new();
@@ -207,7 +218,7 @@ pub async fn transcode(
 
     run_commands(commands).await?;
 
-    Ok(output_file_path)
+    Ok((output_file_path, transcoding_commands_str.join(" | ")))
 }
 
 async fn run_commands(commands: Vec<Command>) -> anyhow::Result<()> {

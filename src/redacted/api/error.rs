@@ -7,4 +7,7 @@ pub enum RedactedApiError {
 
     #[error("Redacted API returned no response body")]
     BodyError,
+
+    #[error("Redacted API returned an error while uploading a torrent: {0}")]
+    UploadError(String),
 }
