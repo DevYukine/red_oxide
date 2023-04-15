@@ -1,25 +1,30 @@
-use crate::api::error::RedactedApiError;
-use crate::api::model::{ApiResponse, ApiResponseReceived, IndexResponse};
-use crate::built_info;
-use anyhow::Error;
-use reqwest::Response;
-use serde::de::DeserializeOwned;
+use std::time::Duration;
 
-const API_URL: &str = "https://redacted.ch/ajax.php?action=";
-const TRACKER_URL: &str = "https://redacted.ch/torrents.php?action=download&id=";
+use anyhow::Error;
+use reqwest::{Client, Method, Request, Response, Url};
+use serde::de::DeserializeOwned;
+use tower::limit::RateLimit;
+use tower::{Service, ServiceExt};
+
+use crate::built_info;
+use crate::redacted::api::constants::API_URL;
+use crate::redacted::api::error::RedactedApiError;
+use crate::redacted::api::model::{
+    ApiResponse, ApiResponseReceived, IndexResponse, TorrentGroupResponse, TorrentResponse,
+};
 
 pub struct RedactedApi {
-    client: reqwest::Client,
+    service: RateLimit<Client>,
 }
 
 impl RedactedApi {
     pub fn new(api_key: String) -> Self {
-        let client = reqwest::Client::builder()
+        let client = Client::builder()
             .default_headers({
                 let mut headers = reqwest::header::HeaderMap::new();
                 headers.insert(
                     "User-Agent",
-                    format!("RedOxide/{}", built_info::PKG_VERSION)
+                    format!("{}/{} ", built_info::PKG_NAME, built_info::PKG_VERSION)
                         .parse()
                         .unwrap(),
                 );
@@ -29,30 +34,73 @@ impl RedactedApi {
             })
             .build()
             .unwrap();
-        Self { client }
+
+        let service = tower::ServiceBuilder::new()
+            .rate_limit(10, Duration::from_secs(10))
+            .service(client);
+
+        Self { service }
     }
 
-    pub async fn index(&self) -> Result<ApiResponse<IndexResponse>, Error> {
-        let res = self
-            .client
-            .post(API_URL.to_owned() + "index")
-            .send()
-            .await?;
+    pub async fn index(&mut self) -> Result<ApiResponse<IndexResponse>, Error> {
+        let req = Request::new(
+            Method::POST,
+            Url::parse(&(API_URL.to_owned() + "index")).unwrap(),
+        );
+
+        let res = self.service.ready().await?.call(req).await?;
 
         Ok(self
             .handle_status_and_parse_body::<IndexResponse>(res)
             .await?)
     }
 
-    pub async fn get_torrent_info(&self, torrent_id: i64) -> Result<(), reqwest::Error> {
-        let res = self
-            .client
-            .post(API_URL.to_owned() + &format!("torrent?id={}", torrent_id.to_string()))
-            .send()
-            .await?;
+    pub async fn get_torrent_info(
+        &mut self,
+        torrent_id: i64,
+    ) -> Result<ApiResponse<TorrentResponse>, Error> {
+        let req = Request::new(
+            Method::GET,
+            Url::parse(&(API_URL.to_owned() + &format!("torrent&id={}", torrent_id.to_string())))
+                .unwrap(),
+        );
 
-        //let text = res.json::<ApiResponse<>>().await?;
-        Ok(())
+        let res = self.service.ready().await?.call(req).await?;
+
+        Ok(self
+            .handle_status_and_parse_body::<TorrentResponse>(res)
+            .await?)
+    }
+
+    pub async fn get_torrent_group(
+        &mut self,
+        group_id: i64,
+    ) -> Result<ApiResponse<TorrentGroupResponse>, Error> {
+        let req = Request::new(
+            Method::GET,
+            Url::parse(
+                &(API_URL.to_owned() + &format!("torrentgroup&id={}", group_id.to_string())),
+            )
+            .unwrap(),
+        );
+
+        let res = self.service.ready().await?.call(req).await?;
+
+        Ok(self
+            .handle_status_and_parse_body::<TorrentGroupResponse>(res)
+            .await?)
+    }
+
+    pub async fn download_torrent(&mut self, torrent_id: i64) -> Result<Vec<u8>, Error> {
+        let req = Request::new(
+            Method::GET,
+            Url::parse(&(API_URL.to_owned() + &format!("download&id={}", torrent_id.to_string())))
+                .unwrap(),
+        );
+
+        let res = self.service.ready().await?.call(req).await?;
+
+        Ok(res.bytes().await?.to_vec())
     }
 
     async fn handle_status_and_parse_body<T: DeserializeOwned>(

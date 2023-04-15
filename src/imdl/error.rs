@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum HashError {
+pub enum ImdlError {
     #[error("Hash error")]
-    HashError(),
+    HashError,
 }

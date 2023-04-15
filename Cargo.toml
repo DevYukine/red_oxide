@@ -1,0 +1,35 @@
+[package]
+name = "red_oxide"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+authors = ["DevYukine devyukine@gmx.de"]
+description = "A simple helper while uploading music to redacted.ch"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "^1.0"
+clap = { version = "^4.2", features = ["derive"] }
+console = "^0.15"
+indicatif = "^0.17"
+reqwest = { version = "^0.11", features=["rustls-tls", "json"] }
+serde = { version = "^1", features = ["derive"] }
+serde_json = "^1"
+thiserror = "^1"
+tokio = { version = "^1", features = ["full"] }
+regex = "^1"
+audiotags = "^0.4"
+env_logger = "^0.10"
+log = "^0.4"
+num_cpus = "^1.15"
+tower = { version = "^0.4", features = ["util", "limit"] }
+strum = "^0.24"
+strum_macros = "^0.24"
+derivative = "^2.2"
+claxon = "^0.4"
+async-recursion = "^1.0"
+lazy_static = "^1.4"
+
+[build-dependencies]
+built = "^0.6"

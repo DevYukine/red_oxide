@@ -1,14 +1,23 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MediaSearchType {
+    #[serde(rename = "CD")]
     CD,
+    #[serde(rename = "DVD")]
     DVD,
+    #[serde(rename = "Vinyl")]
     Vinyl,
+    #[serde(rename = "Soundboard")]
     Soundboard,
+    #[serde(rename = "SACD")]
     SACD,
+    #[serde(rename = "DAT")]
     DAT,
+    #[serde(rename = "WEB")]
     WEB,
+    #[serde(rename = "Blu-ray")]
     BLURAY,
 }
 
@@ -42,6 +51,52 @@ pub struct IndexResponse {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UserProfileResponse {
+    pub username: String,
+    pub avatar: String,
+    pub is_friend: bool,
+    pub profile_text: String,
+    pub bb_profile_text: String,
+    pub profile_album: ProfileAlbum,
+    pub stats: Stats,
+    pub ranks: Ranks,
+    pub personal: Personal,
+    pub community: Community,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtistResponse {
+    pub id: i64,
+    pub name: String,
+    pub notifications_enabled: bool,
+    pub has_bookmarked: bool,
+    pub image: String,
+    pub body: String,
+    pub vanity_house: bool,
+    pub tags: Vec<Tag>,
+    pub similar_artists: Vec<SimilarArtist>,
+    pub statistics: Statistics,
+    pub torrentgroup: Vec<Group>,
+    pub requests: Vec<Request>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TorrentResponse {
+    pub group: Group,
+    pub torrent: Torrent,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TorrentGroupResponse {
+    pub group: Group,
+    pub torrents: Vec<Torrent>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Notifications {
     pub messages: i64,
     pub notifications: i64,
@@ -57,21 +112,6 @@ pub struct Userstats {
     pub ratio: f64,
     pub requiredratio: f64,
     pub class: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UserProfileResponse {
-    pub username: String,
-    pub avatar: String,
-    pub is_friend: bool,
-    pub profile_text: String,
-    pub bb_profile_text: String,
-    pub profile_album: ProfileAlbum,
-    pub stats: Stats,
-    pub ranks: Ranks,
-    pub personal: Personal,
-    pub community: Community,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -138,23 +178,6 @@ pub struct Community {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ArtistResponse {
-    pub id: i64,
-    pub name: String,
-    pub notifications_enabled: bool,
-    pub has_bookmarked: bool,
-    pub image: String,
-    pub body: String,
-    pub vanity_house: bool,
-    pub tags: Vec<Tag>,
-    pub similar_artists: Vec<SimilarArtist>,
-    pub statistics: Statistics,
-    pub torrentgroup: Vec<Torrentgroup>,
-    pub requests: Vec<Request>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Tag {
     pub name: String,
     pub count: i64,
@@ -181,45 +204,40 @@ pub struct Statistics {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Torrentgroup {
-    pub group_id: i64,
-    pub group_name: String,
-    pub group_year: i64,
-    pub group_record_label: String,
-    pub group_catalogue_number: String,
-    pub tags: Vec<String>,
-    pub release_type: i64,
-    pub group_vanity_house: bool,
-    pub has_bookmarked: bool,
-    pub torrent: Vec<Torrent>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Torrent {
     pub id: i64,
-    pub group_id: i64,
     pub media: String,
     pub format: String,
     pub encoding: String,
-    pub remaster_year: i64,
     pub remastered: bool,
+    pub remaster_year: Option<i64>,
     pub remaster_title: String,
     pub remaster_record_label: String,
+    pub remaster_catalogue_number: String,
     pub scene: bool,
     pub has_log: bool,
     pub has_cue: bool,
     pub log_score: i64,
     pub file_count: i64,
+    pub size: i64,
+    pub seeders: i64,
+    pub leechers: i64,
+    pub snatched: i64,
+    #[serde(rename = "has_snatched")]
+    pub has_snatched: bool,
+    pub trumpable: bool,
+    pub lossy_web_approved: bool,
+    pub lossy_master_approved: bool,
     pub free_torrent: bool,
     pub is_neutralleech: bool,
     pub is_freeload: bool,
-    pub size: i64,
-    pub leechers: i64,
-    pub seeders: i64,
-    pub snatched: i64,
+    pub reported: bool,
     pub time: String,
-    pub has_file: i64,
+    pub description: String,
+    pub file_list: String,
+    pub file_path: String,
+    pub user_id: i64,
+    pub username: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -232,4 +250,38 @@ pub struct Request {
     pub time_added: String,
     pub votes: i64,
     pub bounty: i64,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Group {
+    pub wiki_body: String,
+    pub bb_body: String,
+    pub wiki_image: String,
+    pub id: i64,
+    pub name: String,
+    pub year: i64,
+    pub record_label: String,
+    pub catalogue_number: String,
+    pub release_type: i64,
+    pub category_id: i64,
+    pub category_name: String,
+    pub time: String,
+    pub vanity_house: bool,
+    pub is_bookmarked: bool,
+    pub tags: Vec<String>,
+    pub music_info: MusicInfo,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MusicInfo {
+    pub artists: Vec<Artist>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Artist {
+    pub id: i64,
+    pub name: String,
 }

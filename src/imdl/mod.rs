@@ -1,2 +1,4 @@
 pub mod error;
-pub mod verification;
+pub mod hash;
+pub mod torrent;
+mod util;

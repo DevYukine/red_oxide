@@ -1,17 +1,12 @@
-use crate::hash::error::HashError;
+use crate::imdl::error::ImdlError;
+use crate::imdl::util;
 use tokio::process::Command;
 
-pub async fn run_imdl_verification(
+pub async fn verify_torrent_hash(
     content_path: &str,
     torrent_path: &str,
-) -> Result<bool, HashError> {
-    let program_name = if cfg!(target_os = "windows") {
-        "imdl.exe"
-    } else {
-        "imdl"
-    };
-
-    let mut cmd = Command::new(program_name);
+) -> Result<bool, ImdlError> {
+    let mut cmd = Command::new(util::get_executable_name());
     cmd.arg("torrent");
     cmd.arg("verify");
     cmd.arg(torrent_path);
@@ -22,7 +17,7 @@ pub async fn run_imdl_verification(
         Ok(o) => o,
         Err(e) => {
             eprintln!("Failed to run imdl: {}", e);
-            return Err(HashError::HashError());
+            return Err(ImdlError::HashError);
         }
     };
 
