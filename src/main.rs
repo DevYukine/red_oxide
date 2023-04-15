@@ -107,7 +107,7 @@ const WARNING: &str = "[⚠️]";
 const ERROR: &str = "[❌]";
 
 #[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
+async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -117,7 +117,7 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn transcode(mut cmd: TranscodeCommand) -> Result<(), anyhow::Error> {
+async fn transcode(mut cmd: TranscodeCommand) -> anyhow::Result<()> {
     let term = console::Term::stdout();
 
     if let Some(config_path) = &cmd.config_file {
@@ -164,7 +164,7 @@ async fn handle_url(
     api: &mut RedactedApi,
     cmd: &TranscodeCommand,
     passkey: String,
-) -> Result<(), anyhow::Error> {
+) -> anyhow::Result<()> {
     lazy_static! {
         static ref RE: Regex = regex::Regex::new(
             r"(https://|http://)?redacted\.ch/torrents\.php\?id=(\d+)&torrentid=(\d+)"

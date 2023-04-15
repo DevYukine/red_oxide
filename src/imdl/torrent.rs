@@ -8,7 +8,7 @@ pub async fn create_torrent(
     content_path: &PathBuf,
     torrent_path: &PathBuf,
     announce_url: String,
-) -> Result<(), anyhow::Error> {
+) -> anyhow::Result<()> {
     let mut cmd = Command::new(util::get_executable_name());
     cmd.arg("torrent");
     cmd.arg("create");

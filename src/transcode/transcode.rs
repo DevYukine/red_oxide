@@ -30,7 +30,7 @@ pub async fn transcode_release(
     term: Arc<Term>,
     torrent_id: i64,
     pb: ProgressBar,
-) -> Result<PathBuf, anyhow::Error> {
+) -> anyhow::Result<PathBuf> {
     let needs_resample = util::is_24_bit_flac(flac_dir).await?;
 
     if format == Flac && !needs_resample {
@@ -84,7 +84,7 @@ pub async fn transcode(
     flac_file_path: &PathBuf,
     output_dir: &PathBuf,
     format: ReleaseType,
-) -> Result<PathBuf, anyhow::Error> {
+) -> anyhow::Result<PathBuf> {
     let flac_file_cloned = flac_file_path.clone();
     let reader = tokio::task::spawn_blocking(move || FlacReader::open(flac_file_cloned)).await??;
 
@@ -210,7 +210,7 @@ pub async fn transcode(
     Ok(output_file_path)
 }
 
-async fn run_commands(commands: Vec<Command>) -> Result<(), anyhow::Error> {
+async fn run_commands(commands: Vec<Command>) -> anyhow::Result<()> {
     let mut content = vec![];
 
     for mut command in commands {

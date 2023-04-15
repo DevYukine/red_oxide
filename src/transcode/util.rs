@@ -8,7 +8,7 @@ use tokio::fs;
 pub async fn copy_other_allowed_files(
     original_dir_path: &PathBuf,
     transcode_dir_path: &PathBuf,
-) -> Result<(), anyhow::Error> {
+) -> anyhow::Result<()> {
     let mut dir = fs::read_dir(original_dir_path).await?;
 
     while let Some(entry) = dir.next_entry().await? {
@@ -37,7 +37,7 @@ pub async fn copy_other_allowed_files(
 }
 
 #[async_recursion]
-pub async fn is_24_bit_flac(flac_dir_path: &PathBuf) -> Result<bool, anyhow::Error> {
+pub async fn is_24_bit_flac(flac_dir_path: &PathBuf) -> anyhow::Result<bool> {
     let mut dir = fs::read_dir(flac_dir_path).await?;
 
     while let Some(entry) = dir.next_entry().await? {
@@ -64,7 +64,7 @@ pub async fn is_24_bit_flac(flac_dir_path: &PathBuf) -> Result<bool, anyhow::Err
 }
 
 #[async_recursion]
-pub async fn is_multichannel(flac_dir_path: &PathBuf) -> Result<bool, anyhow::Error> {
+pub async fn is_multichannel(flac_dir_path: &PathBuf) -> anyhow::Result<bool> {
     let mut dir = fs::read_dir(flac_dir_path).await?;
 
     while let Some(entry) = dir.next_entry().await? {

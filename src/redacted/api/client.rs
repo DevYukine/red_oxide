@@ -42,7 +42,7 @@ impl RedactedApi {
         Self { service }
     }
 
-    pub async fn index(&mut self) -> Result<ApiResponse<IndexResponse>, Error> {
+    pub async fn index(&mut self) -> anyhow::Result<ApiResponse<IndexResponse>> {
         let req = Request::new(
             Method::POST,
             Url::parse(&(API_URL.to_owned() + "index")).unwrap(),
@@ -58,7 +58,7 @@ impl RedactedApi {
     pub async fn get_torrent_info(
         &mut self,
         torrent_id: i64,
-    ) -> Result<ApiResponse<TorrentResponse>, Error> {
+    ) -> anyhow::Result<ApiResponse<TorrentResponse>> {
         let req = Request::new(
             Method::GET,
             Url::parse(&(API_URL.to_owned() + &format!("torrent&id={}", torrent_id.to_string())))
@@ -75,7 +75,7 @@ impl RedactedApi {
     pub async fn get_torrent_group(
         &mut self,
         group_id: i64,
-    ) -> Result<ApiResponse<TorrentGroupResponse>, Error> {
+    ) -> anyhow::Result<ApiResponse<TorrentGroupResponse>> {
         let req = Request::new(
             Method::GET,
             Url::parse(
@@ -91,7 +91,7 @@ impl RedactedApi {
             .await?)
     }
 
-    pub async fn download_torrent(&mut self, torrent_id: i64) -> Result<Vec<u8>, Error> {
+    pub async fn download_torrent(&mut self, torrent_id: i64) -> anyhow::Result<Vec<u8>> {
         let req = Request::new(
             Method::GET,
             Url::parse(&(API_URL.to_owned() + &format!("download&id={}", torrent_id.to_string())))
@@ -106,7 +106,7 @@ impl RedactedApi {
     async fn handle_status_and_parse_body<T: DeserializeOwned>(
         &self,
         response: Response,
-    ) -> Result<ApiResponse<T>, Error> {
+    ) -> anyhow::Result<ApiResponse<T>> {
         let status = response.status();
 
         let parsed: ApiResponseReceived<T> = response.json::<ApiResponseReceived<T>>().await?;
