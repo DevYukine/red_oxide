@@ -5,7 +5,7 @@ use audiotags::{Tag, TagType};
 use tokio::fs;
 
 pub async fn copy_tags_to_mp3(from: &PathBuf, to: &PathBuf) -> anyhow::Result<()> {
-    let mut from_tag = Tag::default().read_from_path(from)?;
+    let from_tag = Tag::default().read_from_path(from)?;
 
     let mut mp3_tags = from_tag.to_dyn_tag(TagType::Id3v2);
     mp3_tags.write_to_path(to.to_str().unwrap())?;
