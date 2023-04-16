@@ -22,7 +22,7 @@ use crate::config::models::RedOxideConfig;
 use crate::fs::util::count_files_with_extension;
 use crate::redacted::api::client::RedactedApi;
 use crate::redacted::api::constants::TRACKER_URL;
-use crate::redacted::models::{Category, Format, ReleaseType};
+use crate::redacted::models::{Category, ReleaseType};
 use crate::redacted::upload::TorrentUploadData;
 use crate::redacted::util::perma_link;
 use crate::transcode::util::copy_other_allowed_files;
@@ -305,13 +305,15 @@ async fn handle_url(
         year = group.year;
     }
 
+    let group_name = group.name.replace(":", "");
+
     let base_name = if torrent.remaster_title.len() > 1 {
         format!(
             "{} - {} ({}) [{}]",
-            artist, group.name, torrent.remaster_title, year
+            artist, group_name, torrent.remaster_title, year
         )
     } else {
-        format!("{} - {} [{}]", artist, group.name, year)
+        format!("{} - {} [{}]", artist, group_name, year)
     };
 
     let flac_path = cmd.content_directory.join(torrent.file_path.clone());
