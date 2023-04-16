@@ -58,9 +58,9 @@ struct TranscodeCommand {
     #[arg(long, default_value = "false")]
     debug: bool,
 
-    /// If the upload should be done manually or not
+    /// If the upload should be done automatically
     #[arg(long, short, default_value = "false")]
-    manual: bool,
+    automatic_upload: bool,
 
     /// The number of THREADS to use, defaults to the amount of cores available
     #[arg(long, short)]
@@ -122,7 +122,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn transcode(mut cmd: TranscodeCommand) -> anyhow::Result<()> {
-    let term = console::Term::stdout();
+    let term = Term::stdout();
 
     if let Some(config_path) = &cmd.config_file {
         let mut file = File::open(config_path).await?;
@@ -481,7 +481,7 @@ async fn handle_url(
             ReleaseType::Mp3V0 => "V0 (VBR)".to_string(),
         };
 
-        if !cmd.dry_run && !cmd.manual {
+        if !cmd.dry_run && cmd.automatic_upload {
             let upload_data = TorrentUploadData {
                 torrent: torrent_file_data,
                 torrent_name: torrent_path
@@ -529,7 +529,7 @@ async fn handle_url(
             ))?;
         }
 
-        if cmd.manual {
+        if !cmd.automatic_upload {
             term.write_line("[⏸️] Manual mode enabled, skipping automatic upload")?;
 
             let scene = if torrent.scene { "Yes" } else { "No" };
