@@ -217,6 +217,11 @@ pub async fn transcode(
             "dither",
         ]);
         commands.push(cmd);
+        transcoding_commands_str.clear();
+        transcoding_commands_str.push(format!(
+            "sox input.flac -G -b 16 output.flac rate -v -L {} dither",
+            needed_sample_rate.unwrap().to_string().as_str()
+        ));
     } else {
         for step in transcoding_steps {
             commands.push(step);
