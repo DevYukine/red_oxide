@@ -4,15 +4,11 @@ use async_recursion::async_recursion;
 use audiotags::{Tag, TagType};
 use tokio::fs;
 
-pub async fn copy_tags(from: &PathBuf, to: &PathBuf, is_mp3: bool) -> anyhow::Result<()> {
+pub async fn copy_tags_to_mp3(from: &PathBuf, to: &PathBuf) -> anyhow::Result<()> {
     let mut from_tag = Tag::default().read_from_path(from)?;
 
-    if is_mp3 {
-        let mut mp3_tags = from_tag.to_dyn_tag(TagType::Id3v2);
-        mp3_tags.write_to_path(to.to_str().unwrap())?;
-    } else {
-        from_tag.write_to_path(to.to_str().unwrap())?;
-    }
+    let mut mp3_tags = from_tag.to_dyn_tag(TagType::Id3v2);
+    mp3_tags.write_to_path(to.to_str().unwrap())?;
 
     return Ok(());
 }
@@ -59,7 +55,7 @@ pub fn validate_tags_of_file(path: PathBuf) -> bool {
 
     let (track_number, total_tracks) = tag.track();
 
-    if track_number.is_none() || total_tracks.is_none() {
+    if track_number.is_none() {
         return false;
     }
 
