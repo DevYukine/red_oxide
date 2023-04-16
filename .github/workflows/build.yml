@@ -1,0 +1,79 @@
+name: Build Commit
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  linux:
+    name: Linux Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: [x86_64-unknown-linux-musl, x86_64-unknown-linux-gnu, i686-unknown-linux-gnu]
+    steps:
+      - name: Checkout Source code
+        uses: actions/checkout@v3
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install Rust Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          target: ${{ matrix.target }}
+      - name: Install Build-Tools
+        run: sudo apt-get install build-essential gcc-multilib
+      - name: Build target
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --target ${{ matrix.target }}
+      - name: Upload Action Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: red_oxide_${{ runner.OS }}_${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/red_oxide
+
+  windows:
+    name: Windows Build
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        target: [i686-pc-windows-msvc, x86_64-pc-windows-msvc]
+    steps:
+      - name: Checkout Source code
+        uses: actions/checkout@v3
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install Rust Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target.build_target }}
+          override: true
+      - name: Build target
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --target ${{ matrix.target }}
+      - name: Upload Action Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: red_oxide_${{ runner.OS }}_${{ matrix.target }}.exe
+          path: target/${{ matrix.target }}/release/red_oxide.exe
