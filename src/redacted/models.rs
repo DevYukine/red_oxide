@@ -17,13 +17,13 @@ pub enum ReleaseType {
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum Category {
-    Music = 1,
-    Applications = 2,
-    EBooks = 3,
-    Audiobooks = 4,
-    ELearningVideos = 5,
-    Comedy = 6,
-    Comics = 7,
+    Music = 0,
+    Applications = 1,
+    EBooks = 2,
+    Audiobooks = 3,
+    ELearningVideos = 4,
+    Comedy = 5,
+    Comics = 6,
 }
 
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Clone, Copy)]
@@ -172,30 +172,6 @@ impl From<&str> for Media {
 }
 
 impl Category {
-    pub fn as_int(&self) -> u8 {
-        *self as u8
-    }
-}
-
-impl Release {
-    pub fn as_int(&self) -> u8 {
-        *self as u8
-    }
-}
-
-impl Bitrate {
-    pub fn as_int(&self) -> u8 {
-        *self as u8
-    }
-}
-
-impl Format {
-    pub fn as_int(&self) -> u8 {
-        *self as u8
-    }
-}
-
-impl Media {
     pub fn as_int(&self) -> u8 {
         *self as u8
     }

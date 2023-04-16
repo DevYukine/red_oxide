@@ -468,10 +468,10 @@ async fn handle_url(
         let description = create_description(perma_link.clone(), command.clone());
 
         let format_red = match format {
-            ReleaseType::Flac24 => Format::Flac,
-            ReleaseType::Flac => Format::Flac,
-            ReleaseType::Mp3320 => Format::Mp3,
-            ReleaseType::Mp3V0 => Format::Mp3,
+            ReleaseType::Flac24 => "FLAC",
+            ReleaseType::Flac => "FLAC",
+            ReleaseType::Mp3320 => "MP3",
+            ReleaseType::Mp3V0 => "MP3",
         };
 
         let bitrate = match format {
@@ -482,6 +482,12 @@ async fn handle_url(
         };
 
         if !cmd.dry_run && cmd.automatic_upload {
+            let year = if torrent.remaster_year == 0 {
+                group.year
+            } else {
+                torrent.remaster_year
+            };
+
             let upload_data = TorrentUploadData {
                 torrent: torrent_file_data,
                 torrent_name: torrent_path
@@ -490,27 +496,16 @@ async fn handle_url(
                     .to_str()
                     .unwrap()
                     .to_string(),
-                r#type: group.category_id,
-                releasetype: group.release_type,
-                year: group.year,
-                title: group.name.clone(),
-                artists: group
-                    .music_info
-                    .artists
-                    .iter()
-                    .map(|a| a.name.clone())
-                    .collect(),
-                remaster_year: torrent.remaster_year,
+                r#type: Category::from(&*group.category_name),
+                remaster_year: year,
                 remaster_title: torrent.remaster_title.clone(),
                 remaster_record_label: torrent.remaster_record_label.clone(),
                 remaster_catalogue_number: torrent.remaster_catalogue_number.clone(),
-                scene: torrent.scene,
-                format: format_red,
+                format: format_red.to_string(),
                 bitrate: bitrate.clone(),
                 media: torrent.media.clone(),
                 release_desc: description.clone(),
-                groupid: group.id as u64,
-                tags: group.tags.clone(),
+                group_id: group.id as u64,
             };
 
             api.upload_torrent(upload_data).await?;
