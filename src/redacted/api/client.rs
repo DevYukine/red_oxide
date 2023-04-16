@@ -46,10 +46,7 @@ impl RedactedApi {
     }
 
     pub async fn index(&mut self) -> anyhow::Result<ApiResponse<IndexResponse>> {
-        let req = Request::new(
-            Method::POST,
-            Url::parse(&(API_URL.to_owned() + "index"))?,
-        );
+        let req = Request::new(Method::POST, Url::parse(&(API_URL.to_owned() + "index"))?);
 
         let res = self.service.ready().await?.call(req).await?;
 
@@ -106,12 +103,18 @@ impl RedactedApi {
     pub async fn upload_torrent(&mut self, upload_data: TorrentUploadData) -> anyhow::Result<()> {
         let form = upload_data.into();
 
-        let req = self.client.request(Method::POST, Url::parse(&(API_URL.to_owned() + "upload"))?).multipart(form).build()?;
+        let req = self
+            .client
+            .request(Method::POST, Url::parse(&(API_URL.to_owned() + "upload"))?)
+            .multipart(form)
+            .build()?;
 
         let res = self.service.ready().await?.call(req).await?;
 
         if !res.status().is_success() {
-            return Err(Error::from(RedactedApiError::UploadError(str::from_utf8(&*res.bytes().await?)?.to_string())));
+            return Err(Error::from(RedactedApiError::UploadError(
+                str::from_utf8(&*res.bytes().await?)?.to_string(),
+            )));
         }
 
         Ok(())

@@ -3,7 +3,7 @@ use std::fmt;
 use derivative::Derivative;
 use strum_macros::EnumIter;
 
-use serde_repr::{Serialize_repr, Deserialize_repr};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[derive(Debug, PartialEq, Eq, EnumIter, Derivative, Clone, Copy)]
 #[derivative(Hash)]
@@ -149,7 +149,7 @@ impl From<&str> for Format {
             "AAC" => Format::Aac,
             "AC3" => Format::Ac3,
             "DTS" => Format::Dts,
-            _ => panic!("Unknown format: {}, please report this to Github", value)
+            _ => panic!("Unknown format: {}, please report this to Github", value),
         }
     }
 }
@@ -166,7 +166,7 @@ impl From<&str> for Media {
             "Cassette" => Media::Cassette,
             "WEB" => Media::WEB,
             "Blu-ray" => Media::BluRay,
-            _ => panic!("Unknown media: {}, please report this to Github", value)
+            _ => panic!("Unknown media: {}, please report this to Github", value),
         }
     }
 }

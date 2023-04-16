@@ -9,12 +9,12 @@ use console::Term;
 use dialoguer::Confirm;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use lazy_static::lazy_static;
+use redacted::util::create_description;
 use regex::Regex;
 use strum::IntoEnumIterator;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::task::JoinSet;
-use redacted::util::create_description;
 
 use transcode::transcode::transcode_release;
 
@@ -424,7 +424,11 @@ async fn handle_url(
 
             copy_other_allowed_files(&flac_path_clone, &transcode_folder_path).await?;
 
-            return Ok::<(PathBuf, ReleaseType, String), anyhow::Error>((folder_path, format, command));
+            return Ok::<(PathBuf, ReleaseType, String), anyhow::Error>((
+                folder_path,
+                format,
+                command,
+            ));
         }));
     }
 
@@ -455,8 +459,7 @@ async fn handle_url(
 
         term.write_line(&format!(
             "{} Created .torrent files for format {}",
-            SUCCESS,
-            format
+            SUCCESS, format
         ))?;
 
         let torrent_file_data = tokio::fs::read(&torrent_path).await?;
@@ -481,12 +484,22 @@ async fn handle_url(
         if !cmd.dry_run && !cmd.manual {
             let upload_data = TorrentUploadData {
                 torrent: torrent_file_data,
-                torrent_name: torrent_path.file_name().unwrap().to_str().unwrap().to_string(),
+                torrent_name: torrent_path
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
                 r#type: group.category_id,
                 releasetype: group.release_type,
                 year: group.year,
                 title: group.name.clone(),
-                artists: group.music_info.artists.iter().map(|a| a.name.clone()).collect(),
+                artists: group
+                    .music_info
+                    .artists
+                    .iter()
+                    .map(|a| a.name.clone())
+                    .collect(),
                 remaster_year: torrent.remaster_year,
                 remaster_title: torrent.remaster_title.clone(),
                 remaster_record_label: torrent.remaster_record_label.clone(),
@@ -504,7 +517,11 @@ async fn handle_url(
         }
 
         if cmd.move_transcode_to_content {
-            tokio::fs::rename(&path, &cmd.content_directory.join(path.file_name().unwrap())).await?;
+            tokio::fs::rename(
+                &path,
+                &cmd.content_directory.join(path.file_name().unwrap()),
+            )
+            .await?;
 
             term.write_line(&format!(
                 "{} Moved transcoded release to content directory",
@@ -515,7 +532,7 @@ async fn handle_url(
         if cmd.manual {
             term.write_line("[⏸️] Manual mode enabled, skipping automatic upload")?;
 
-            let scene = if torrent.scene { "Yes" } else {"No"};
+            let scene = if torrent.scene { "Yes" } else { "No" };
             let format = match format {
                 ReleaseType::Flac24 => "FLAC",
                 ReleaseType::Flac => "FLAC",
@@ -525,11 +542,22 @@ async fn handle_url(
 
             term.write_line(&*("Link: ".to_owned() + &*perma_link))?;
             term.write_line(&*("Name: ".to_owned() + &*group.name.clone()))?;
-            term.write_line(&*("Artist(s): ".to_owned() + &group.music_info.artists.iter().map(|a| a.name.clone()).collect::<Vec<String>>().join(", ")))?;
+            term.write_line(
+                &*("Artist(s): ".to_owned()
+                    + &group
+                        .music_info
+                        .artists
+                        .iter()
+                        .map(|a| a.name.clone())
+                        .collect::<Vec<String>>()
+                        .join(", ")),
+            )?;
             term.write_line(&*("Edition Year: ".to_owned() + &*torrent.remaster_year.to_string()))?;
             term.write_line(&*("Edition Title: ".to_owned() + &torrent.remaster_title))?;
             term.write_line(&*("Record Label: ".to_owned() + &torrent.remaster_record_label))?;
-            term.write_line(&*("Catalogue Number: ".to_owned() + &torrent.remaster_catalogue_number))?;
+            term.write_line(
+                &*("Catalogue Number: ".to_owned() + &torrent.remaster_catalogue_number),
+            )?;
             term.write_line(&*("Scene: ".to_owned() + scene))?;
             term.write_line(&*("Format: ".to_owned() + format))?;
             term.write_line(&*("Bitrate: ".to_owned() + &bitrate))?;
@@ -539,7 +567,9 @@ async fn handle_url(
 
             let mut prompt = Confirm::new();
 
-            prompt.with_prompt("Confirm once you are done uploading...").default(true);
+            prompt
+                .with_prompt("Confirm once you are done uploading...")
+                .default(true);
 
             prompt.interact()?;
         }
