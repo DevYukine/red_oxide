@@ -24,11 +24,9 @@ jobs:
             target
           key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Install Rust Toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          profile: minimal
-          override: true
           target: ${{ matrix.target }}
       - name: Install Build-Tools
         run: sudo apt-get install build-essential gcc-multilib
@@ -62,11 +60,10 @@ jobs:
             target
           key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Install Rust Toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          target: ${{ matrix.target.build_target }}
-          override: true
+          target: ${{ matrix.target }}
       - name: Build target
         uses: actions-rs/cargo@v1
         with:
