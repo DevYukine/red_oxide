@@ -123,7 +123,7 @@ pub async fn transcode(
         Mp3V0 => ".mp3",
         Mp3320 => ".mp3",
         Flac => ".flac",
-        Flac24 => ".flac"
+        Flac24 => ".flac",
     };
 
     let output_file_path = output_dir.join(
@@ -182,7 +182,8 @@ pub async fn transcode(
             output_file_path_str,
         ]);
         transcoding_steps.push(cmd);
-        transcoding_commands_str.push("lame -S -V 0 --vbr-new --ignore-tag-errors - output.mp3".to_string());
+        transcoding_commands_str
+            .push("lame -S -V 0 --vbr-new --ignore-tag-errors - output.mp3".to_string());
     } else if format == Mp3320 {
         let mut cmd = Command::new(get_lame_executable());
         cmd.args(&[
@@ -195,7 +196,8 @@ pub async fn transcode(
             output_file_path_str,
         ]);
         transcoding_steps.push(cmd);
-        transcoding_commands_str.push("lame -S -h -b 320 --ignore-tag-errors - output.mp3".to_string());
+        transcoding_commands_str
+            .push("lame -S -h -b 320 --ignore-tag-errors - output.mp3".to_string());
     } else if format == Flac {
         let mut cmd = Command::new(get_flac_executable());
         cmd.args(&["--best", "-o", output_file_path_str, "-"]);
