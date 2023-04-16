@@ -3,5 +3,5 @@ use serde::Serialize;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RedOxideConfig {
-    pub(crate) api_key: String,
+    pub api_key: String,
 }
