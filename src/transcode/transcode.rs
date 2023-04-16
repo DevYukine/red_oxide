@@ -63,7 +63,7 @@ pub async fn transcode_release(
         let output_dir = output_dir.clone();
         join_set.spawn(async move {
             let (output_path, command) = transcode(&path, &output_dir, format).await?;
-            crate::tags::util::copy_tags(&path, &output_path).await?;
+            crate::tags::util::copy_tags(&path, &output_path, format != Flac).await?;
 
             pb.inc(1);
 
