@@ -10,7 +10,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::task::JoinSet;
 
-use ReleaseType::Mp3V0;
+use ReleaseType::{Flac24, Mp3V0};
 
 use crate::fs::util::get_all_files_with_extension;
 use crate::redacted::models::ReleaseType;
@@ -116,13 +116,20 @@ pub async fn transcode(
         return Err(TranscodeError::TranscodeDownmixError(flac_file_path.clone()).into());
     }
 
+    let file_extension_to_use = match format {
+        Mp3V0 => ".mp3",
+        Mp3320 => ".mp3",
+        Flac => ".flac",
+        Flac24 => ".flac"
+    };
+
     let output_file_path = output_dir.join(
         flac_file_path
             .file_name()
             .unwrap()
             .to_str()
             .unwrap()
-            .replace(".flac", ".mp3"),
+            .replace(".flac", file_extension_to_use),
     );
 
     let flac_file_path_str = flac_file_path.to_str().unwrap();
