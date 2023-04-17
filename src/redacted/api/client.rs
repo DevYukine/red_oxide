@@ -12,6 +12,7 @@ use crate::redacted::api::constants::API_URL;
 use crate::redacted::api::error::RedactedApiError;
 use crate::redacted::api::model::{
     ApiResponse, ApiResponseReceived, IndexResponse, TorrentGroupResponse, TorrentResponse,
+    TorrentUploadResponse,
 };
 use crate::redacted::upload::TorrentUploadData;
 
@@ -100,7 +101,10 @@ impl RedactedApi {
         Ok(res.bytes().await?.to_vec())
     }
 
-    pub async fn upload_torrent(&mut self, upload_data: TorrentUploadData) -> anyhow::Result<()> {
+    pub async fn upload_torrent(
+        &mut self,
+        upload_data: TorrentUploadData,
+    ) -> anyhow::Result<ApiResponse<TorrentUploadResponse>> {
         let form = upload_data.into();
 
         let req = self
@@ -117,7 +121,9 @@ impl RedactedApi {
             )));
         }
 
-        Ok(())
+        Ok(self
+            .handle_status_and_parse_body::<TorrentUploadResponse>(res)
+            .await?)
     }
 
     async fn handle_status_and_parse_body<T: DeserializeOwned>(

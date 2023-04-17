@@ -484,36 +484,6 @@ async fn handle_url(
             ReleaseType::Mp3V0 => "V0 (VBR)".to_string(),
         };
 
-        if !cmd.dry_run && cmd.automatic_upload {
-            let year = if torrent.remaster_year == 0 {
-                group.year
-            } else {
-                torrent.remaster_year
-            };
-
-            let upload_data = TorrentUploadData {
-                torrent: torrent_file_data,
-                torrent_name: torrent_path
-                    .file_name()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
-                r#type: Category::from(&*group.category_name),
-                remaster_year: year,
-                remaster_title: torrent.remaster_title.clone(),
-                remaster_record_label: torrent.remaster_record_label.clone(),
-                remaster_catalogue_number: torrent.remaster_catalogue_number.clone(),
-                format: format_red.to_string(),
-                bitrate: bitrate.clone(),
-                media: torrent.media.clone(),
-                release_desc: description.clone(),
-                group_id: group.id as u64,
-            };
-
-            api.upload_torrent(upload_data).await?;
-        }
-
         if cmd.move_transcode_to_content {
             tokio::fs::rename(
                 &path,
@@ -570,6 +540,36 @@ async fn handle_url(
                 .default(true);
 
             prompt.interact()?;
+        } else if !cmd.dry_run {
+            let year = if torrent.remaster_year == 0 {
+                group.year
+            } else {
+                torrent.remaster_year
+            };
+
+            let upload_data = TorrentUploadData {
+                torrent: torrent_file_data,
+                torrent_name: torrent_path
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                r#type: Category::from(&*group.category_name),
+                remaster_year: year,
+                remaster_title: torrent.remaster_title.clone(),
+                remaster_record_label: torrent.remaster_record_label.clone(),
+                remaster_catalogue_number: torrent.remaster_catalogue_number.clone(),
+                format: format_red.to_string(),
+                bitrate: bitrate.clone(),
+                media: torrent.media.clone(),
+                release_desc: description.clone(),
+                group_id: group.id as u64,
+            };
+
+            let res = api.upload_torrent(upload_data).await?;
+
+            term.write_line(&format!("[🔼] Uploaded {} release to REDacted https://redacted.ch/torrents.php?id={}&torrentid={}", format, group_id, res.response.torrent_id))?;
         }
     }
 
