@@ -23,7 +23,7 @@ pub async fn valid_tags(flac_dir_path: &PathBuf, media: &Media) -> anyhow::Resul
         let path = entry.path();
 
         if path.is_dir() {
-            let (valid, is_vinyl) = validate_tags_of_file(path, media)?;
+            let (valid, is_vinyl) = valid_tags(&path, media).await?;
 
             if !valid {
                 return Ok((true, is_vinyl));
