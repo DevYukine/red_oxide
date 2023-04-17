@@ -12,6 +12,7 @@ use lazy_static::lazy_static;
 use redacted::util::create_description;
 use regex::Regex;
 use strum::IntoEnumIterator;
+use tags::util::valid_tags;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::task::JoinSet;
@@ -22,7 +23,7 @@ use crate::config::models::RedOxideConfig;
 use crate::fs::util::count_files_with_extension;
 use crate::redacted::api::client::RedactedApi;
 use crate::redacted::api::constants::TRACKER_URL;
-use crate::redacted::models::{Category, ReleaseType};
+use crate::redacted::models::{Category, Media, ReleaseType};
 use crate::redacted::upload::TorrentUploadData;
 use crate::redacted::util::perma_link;
 use crate::transcode::util::copy_other_allowed_files;
@@ -155,8 +156,15 @@ async fn transcode(mut cmd: TranscodeCommand) -> anyhow::Result<()> {
         SUCCESS, index_response.username
     ))?;
 
-    for url in &cmd.urls {
-        handle_url(url, &term, &mut api, &cmd, index_response.passkey.clone()).await?;
+    for url in cmd.urls.clone() {
+        handle_url(
+            url.as_str(),
+            &term,
+            &mut api,
+            &mut cmd,
+            index_response.passkey.clone(),
+        )
+        .await?;
     }
 
     Ok(())
@@ -166,7 +174,7 @@ async fn handle_url(
     url: &str,
     term: &Term,
     api: &mut RedactedApi,
-    cmd: &TranscodeCommand,
+    cmd: &mut TranscodeCommand,
     passkey: String,
 ) -> anyhow::Result<()> {
     lazy_static! {
@@ -326,7 +334,17 @@ async fn handle_url(
         return Ok(());
     }
 
-    if !tags::util::valid_tags(&flac_path).await? {
+    let media = Media::from(&*torrent.media);
+
+    let (valid, invalid_track_number_vinyl) = valid_tags(&flac_path, &media).await?;
+
+    if !valid && invalid_track_number_vinyl {
+        term.write_line(&format!(
+            "{} Release is Vinyl and has either no set track number or in a non standard format (e.g. A1, A2 etc), you will be prompted once transcode is done to manually check & adjust the transcode tags as needed!", WARNING
+        ))?;
+
+        cmd.automatic_upload = false;
+    } else if !valid {
         term.write_line(&format!(
             "{} Torrent {} in group {} has FLAC files with invalid tags, skipping...\n You might be able to trump it.",
             WARNING, torrent_id, group_id
@@ -446,6 +464,16 @@ async fn handle_url(
     m.println(format!("{} Transcoding Done!", SUCCESS))?;
     m.clear()?;
 
+    if invalid_track_number_vinyl {
+        let mut prompt = Confirm::new();
+
+        prompt
+            .with_prompt(format!("{} Please check tags of trancoded media and adjust as needed (release is vinyl and has either no track number or in an non standard format e.g. A1, A2 etc which the audiotags library used can't parse), continue?", WARNING))
+            .default(true);
+
+        prompt.interact()?;
+    }
+
     for (path, format, command) in &path_format_command_triple {
         let release_name = path.file_name().unwrap().to_str().unwrap();
 
@@ -492,7 +520,7 @@ async fn handle_url(
             .await?;
 
             term.write_line(&format!(
-                "{} Moved transcoded release to content directory",
+                "{} Moved transcode release to content directory",
                 SUCCESS,
             ))?;
         }

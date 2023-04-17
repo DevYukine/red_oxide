@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use crate::redacted::models::Media;
+use crate::redacted::models::Media::Vinyl;
 use async_recursion::async_recursion;
 use audiotags::{Tag, TagType};
 use tokio::fs;
@@ -14,50 +16,54 @@ pub async fn copy_tags_to_mp3(from: &PathBuf, to: &PathBuf) -> anyhow::Result<()
 }
 
 #[async_recursion]
-pub async fn valid_tags(flac_dir_path: &PathBuf) -> anyhow::Result<bool> {
+pub async fn valid_tags(flac_dir_path: &PathBuf, media: &Media) -> anyhow::Result<(bool, bool)> {
     let mut dir = fs::read_dir(flac_dir_path).await?;
 
     while let Some(entry) = dir.next_entry().await? {
         let path = entry.path();
 
         if path.is_dir() {
-            if valid_tags(&path).await? {
-                return Ok(true);
+            let (valid, is_vinyl) = validate_tags_of_file(path, media)?;
+
+            if !valid {
+                return Ok((true, is_vinyl));
             }
         } else {
             let file_name = path.file_name().unwrap().to_str().unwrap();
 
             if file_name.ends_with(".flac") {
-                if !validate_tags_of_file(path) {
-                    return Ok(false);
+                let (valid, is_vinyl) = validate_tags_of_file(path, media)?;
+
+                if !valid {
+                    return Ok((false, is_vinyl));
                 }
             }
         }
     }
 
-    return Ok(true);
+    return Ok((true, false));
 }
 
-pub fn validate_tags_of_file(path: PathBuf) -> bool {
+pub fn validate_tags_of_file(path: PathBuf, media: &Media) -> anyhow::Result<(bool, bool)> {
     let tag = Tag::new().read_from_path(&path).unwrap();
 
     if tag.artist().is_none() {
-        return false;
+        return Ok((false, false));
     }
 
     if tag.album().is_none() {
-        return false;
+        return Ok((false, false));
     }
 
     if tag.title().is_none() {
-        return false;
+        return Ok((false, false));
     }
 
     let (track_number, total_tracks) = tag.track();
 
     if track_number.is_none() {
-        return false;
+        return Ok((false, media == &Vinyl));
     }
 
-    return true;
+    return Ok((true, false));
 }
