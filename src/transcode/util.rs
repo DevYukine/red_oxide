@@ -6,16 +6,17 @@ use tokio::fs;
 
 #[async_recursion]
 pub async fn copy_other_allowed_files(
+    dir_path: &PathBuf,
     original_dir_path: &PathBuf,
     transcode_dir_path: &PathBuf,
 ) -> anyhow::Result<()> {
-    let mut dir = fs::read_dir(original_dir_path).await?;
+    let mut dir = fs::read_dir(dir_path).await?;
 
     while let Some(entry) = dir.next_entry().await? {
         let path = entry.path();
 
         if path.is_dir() {
-            copy_other_allowed_files(&path, transcode_dir_path).await?;
+            copy_other_allowed_files(&path, original_dir_path, transcode_dir_path).await?;
         } else {
             let extension = path.extension().unwrap().to_str().unwrap().to_lowercase();
 

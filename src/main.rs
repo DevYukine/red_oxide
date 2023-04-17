@@ -424,7 +424,8 @@ async fn handle_url(
 
             let transcode_folder_path = output_dir.join(&folder_path);
 
-            copy_other_allowed_files(&flac_path_clone, &transcode_folder_path).await?;
+            copy_other_allowed_files(&flac_path_clone, &flac_path_clone, &transcode_folder_path)
+                .await?;
 
             return Ok::<(PathBuf, ReleaseType, String), anyhow::Error>((
                 folder_path,
