@@ -92,7 +92,7 @@ struct TranscodeCommand {
     config_file: Option<PathBuf>,
 
     /// If the transcode should be moved to the content directory, useful when you want to start seeding right after you upload
-    #[arg(long, default_value = "false")]
+    #[arg(long, short, default_value = "false")]
     move_transcode_to_content: bool,
 
     /// If the hash check of the original torrent should be skipped, defaults to false, not recommended and if enabled done at own risk!
