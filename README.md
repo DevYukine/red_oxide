@@ -16,6 +16,7 @@ CLI to help uploading to REDactec, inspired by REDBetter.
 - [reqwest](https://github.com/seanmonstar/reqwest) - HTTP client
 - [serde](https://serde.rs/) - Serialization/Deserialization
 - [intermodal](https://github.com/casey/intermodal) - Used for Torrent Hash checking & creation
+- [audiotags](https://docs.rs/audiotags/latest/audiotags/) - Reading/Writing Audio Metadata
 
 ## Contributing
 
