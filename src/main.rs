@@ -413,7 +413,15 @@ async fn handle_url(
 
         prompt.with_prompt(format!("{} Created Spectrograms at {}, please manual check if FLAC is lossless before continuing!", PAUSE, cmd.spectrogram_directory.to_str().unwrap())).default(true);
 
-        prompt.interact()?;
+        let response = prompt.interact()?;
+
+        if !response {
+            term.write_line(&format!(
+                "{} Spectrogram check failed for torrent {} in group {}, skipping",
+                ERROR, torrent_id, group_id
+            ))?;
+            return Ok(());
+        }
     }
 
     if transcode::util::is_multichannel(&flac_path).await? {
