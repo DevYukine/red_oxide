@@ -10,15 +10,15 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::task::JoinSet;
 
-use ReleaseType::{Flac24, Mp3V0};
-
 use crate::fs::util::get_all_files_with_extension;
 use crate::redacted::models::ReleaseType;
 use crate::redacted::models::ReleaseType::{Flac, Mp3320};
 use crate::transcode::error::TranscodeError;
 use crate::transcode::error::TranscodeError::{Invalid24BitFlac, OutputDirectoryExist};
+use ReleaseType::{Flac24, Mp3V0};
+
+use crate::ext_deps::util::{get_flac_executable, get_lame_executable, get_sox_executable};
 use crate::transcode::util;
-use crate::transcode::util::{get_flac_executable, get_lame_executable, get_sox_executable};
 use crate::ERROR;
 
 pub async fn transcode_release(

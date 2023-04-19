@@ -1,15 +1,14 @@
 use std::path::PathBuf;
 
+use crate::ext_deps::util::get_imdl_executable_name;
 use tokio::process::Command;
-
-use crate::imdl::util;
 
 pub async fn create_torrent(
     content_path: &PathBuf,
     torrent_path: &PathBuf,
     announce_url: String,
 ) -> anyhow::Result<()> {
-    let mut cmd = Command::new(util::get_executable_name());
+    let mut cmd = Command::new(get_imdl_executable_name());
     cmd.arg("torrent");
     cmd.arg("create");
     cmd.arg(content_path.to_str().unwrap());

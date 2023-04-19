@@ -20,7 +20,7 @@ use tokio::task::JoinSet;
 use transcode::transcode::transcode_release;
 
 use crate::config::models::RedOxideConfig;
-use crate::fs::util::count_files_with_extension;
+use crate::fs::util::{count_files_with_extension, get_all_files_with_extension};
 use crate::redacted::api::client::RedactedApi;
 use crate::redacted::api::constants::TRACKER_URL;
 use crate::redacted::models::{Category, Media, ReleaseType};
@@ -29,9 +29,11 @@ use crate::redacted::util::perma_link;
 use crate::transcode::util::copy_other_allowed_files;
 
 mod config;
+mod ext_deps;
 mod fs;
 mod imdl;
 mod redacted;
+mod spectrogram;
 mod tags;
 mod transcode;
 
@@ -87,6 +89,10 @@ struct TranscodeCommand {
     #[arg(long)]
     torrent_directory: PathBuf,
 
+    /// The path to the directory where the spectrograms should be stored
+    #[arg(long)]
+    spectrogram_directory: PathBuf,
+
     /// The path to the config file
     #[arg(long, short)]
     config_file: Option<PathBuf>,
@@ -99,6 +105,10 @@ struct TranscodeCommand {
     #[arg(long, default_value = "false")]
     skip_hash_check: bool,
 
+    /// If the spectrogram check of the original torrent should be skipped, defaults to false, not recommended and if enabled done at own risk!
+    #[arg(long, default_value = "false")]
+    skip_spectrogram: bool,
+
     /// If this is a dry run, no files will be uploaded to Redacted
     #[arg(long, short, default_value = "false")]
     dry_run: bool,
@@ -110,6 +120,7 @@ struct TranscodeCommand {
 const SUCCESS: &str = "[✅]";
 const WARNING: &str = "[⚠️]";
 const ERROR: &str = "[❌]";
+const PAUSE: &str = "[⏸️]";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -382,6 +393,37 @@ async fn handle_url(
         tokio::fs::remove_file(&tmp).await?;
     }
 
+    if !cmd.skip_spectrogram {
+        let flacs = get_all_files_with_extension(&flac_path, ".flac").await?;
+
+        let parent = flac_path.file_name().unwrap().to_str().unwrap();
+        let to_create = cmd.spectrogram_directory.join(parent);
+
+        tokio::fs::create_dir_all(&to_create).await?;
+
+        for flac in flacs {
+            spectrogram::spectrogram::make_spectrogram_zoom(
+                &flac_path,
+                &flac,
+                &cmd.spectrogram_directory,
+            )
+            .await?;
+
+            spectrogram::spectrogram::make_spectrogram_full(
+                &flac_path,
+                &flac,
+                &cmd.spectrogram_directory,
+            )
+            .await?;
+        }
+
+        let mut prompt = Confirm::new();
+
+        prompt.with_prompt(format!("{} Created Spectrograms at {}, please manual check if FLAC is lossless before continuing!", PAUSE, cmd.spectrogram_directory.to_str().unwrap())).default(true);
+
+        prompt.interact()?;
+    }
+
     if transcode::util::is_multichannel(&flac_path).await? {
         term.write_line(&format!(
             "{} Torrent {} in group {} is a multichannel release which is unsupported, skipping",
@@ -526,7 +568,10 @@ async fn handle_url(
         }
 
         if !cmd.automatic_upload {
-            term.write_line("[⏸️] Manual mode enabled, skipping automatic upload")?;
+            term.write_line(&*format!(
+                "{} Manual mode enabled, skipping automatic upload",
+                PAUSE
+            ))?;
 
             let scene = if torrent.scene { "Yes" } else { "No" };
             let format = match format {
