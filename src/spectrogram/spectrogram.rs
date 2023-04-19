@@ -30,6 +30,10 @@ pub async fn make_spectrogram_zoom(
     cmd.arg("1:00");
     cmd.arg("-d");
     cmd.arg("0:02");
+    cmd.arg("-t");
+    cmd.arg(&filename);
+    cmd.arg("-c");
+    cmd.arg("red_oxide");
     cmd.arg("-o");
     cmd.arg(
         output_dir
@@ -72,6 +76,10 @@ pub async fn make_spectrogram_full(
     cmd.arg("120");
     cmd.arg("-w");
     cmd.arg("Kaiser");
+    cmd.arg("-t");
+    cmd.arg(&filename);
+    cmd.arg("-c");
+    cmd.arg("red_oxide");
     cmd.arg("-o");
     cmd.arg(
         output_dir
