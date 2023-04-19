@@ -337,14 +337,6 @@ async fn handle_url(
 
     let flac_path = cmd.content_directory.join(torrent.file_path.clone());
 
-    if transcode::util::is_multichannel(&flac_path).await? {
-        term.write_line(&format!(
-            "{} Torrent {} in group {} is a multichannel release which is unsupported, skipping",
-            WARNING, torrent_id, group_id
-        ))?;
-        return Ok(());
-    }
-
     let media = Media::from(&*torrent.media);
 
     let (valid, invalid_track_number_vinyl) = valid_tags(&flac_path, &media).await?;
