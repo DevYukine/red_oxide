@@ -1,4 +1,13 @@
-# 0.2.0 (2023-04-19)
+# [0.3.0](https://github.com/DevYukine/red_oxide/compare/v0.2.0...v0.3.0) (2023-04-19)
+
+
+### Features
+
+* **config:** add missing options and flags to configmake & optional ([e23dba0](https://github.com/DevYukine/red_oxide/commit/e23dba042d8b2d0cbe4ab6f318897bd38db19009))
+
+
+
+# [0.2.0](https://github.com/DevYukine/red_oxide/compare/dce30083d50b0ffd11eb3ada54d8fd9bf87df43f...v0.2.0) (2023-04-19)
 
 
 ### Bug Fixes
