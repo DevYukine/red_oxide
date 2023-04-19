@@ -13,13 +13,11 @@ use redacted::util::create_description;
 use regex::Regex;
 use strum::IntoEnumIterator;
 use tags::util::valid_tags;
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
 use tokio::task::JoinSet;
 
+use crate::config::config::apply_config;
 use transcode::transcode::transcode_release;
 
-use crate::config::models::RedOxideConfig;
 use crate::fs::util::{count_files_with_extension, get_all_files_with_extension};
 use crate::redacted::api::client::RedactedApi;
 use crate::redacted::api::constants::TRACKER_URL;
@@ -55,66 +53,66 @@ enum Commands {
     Transcode(TranscodeCommand),
 }
 
-#[derive(Parser, Debug)]
-struct TranscodeCommand {
+#[derive(Parser, Debug, Clone)]
+pub struct TranscodeCommand {
     /// If debug logs should be shown
     #[arg(long, default_value = "false")]
-    debug: bool,
+    pub debug: bool,
 
     /// If the upload should be done automatically
     #[arg(long, short, default_value = "false")]
-    automatic_upload: bool,
+    pub automatic_upload: bool,
 
     /// The number of THREADS to use, defaults to the amount of cores available
     #[arg(long, short)]
-    threads: Option<u32>,
+    pub threads: Option<u32>,
 
     /// If multiple formats should be transcoded in parallel
     #[arg(long, default_value = "false")]
-    transcode_in_parallel: bool,
+    pub transcode_in_parallel: bool,
 
     /// The Api key from Redacted to use there API with
     #[arg(long)]
-    api_key: Option<String>,
+    pub api_key: Option<String>,
 
     /// The path to the directory where the downloaded torrents are stored
     #[arg(long)]
-    content_directory: PathBuf,
+    pub content_directory: Option<PathBuf>,
 
     /// The path to the directory where the transcoded torrents should be stored
     #[arg(long)]
-    transcode_directory: PathBuf,
+    pub transcode_directory: Option<PathBuf>,
 
     /// The path to the directory where the torrents should be stored
     #[arg(long)]
-    torrent_directory: PathBuf,
+    pub torrent_directory: Option<PathBuf>,
 
     /// The path to the directory where the spectrograms should be stored
     #[arg(long)]
-    spectrogram_directory: PathBuf,
+    pub spectrogram_directory: Option<PathBuf>,
 
     /// The path to the config file
     #[arg(long, short)]
-    config_file: Option<PathBuf>,
+    pub config_file: Option<PathBuf>,
 
     /// If the transcode should be moved to the content directory, useful when you want to start seeding right after you upload
     #[arg(long, short, default_value = "false")]
-    move_transcode_to_content: bool,
+    pub move_transcode_to_content: bool,
 
     /// If the hash check of the original torrent should be skipped, defaults to false, not recommended and if enabled done at own risk!
     #[arg(long, default_value = "false")]
-    skip_hash_check: bool,
+    pub skip_hash_check: bool,
 
     /// If the spectrogram check of the original torrent should be skipped, defaults to false, not recommended and if enabled done at own risk!
     #[arg(long, default_value = "false")]
-    skip_spectrogram: bool,
+    pub skip_spectrogram: bool,
 
     /// If this is a dry run, no files will be uploaded to Redacted
     #[arg(long, short, default_value = "false")]
-    dry_run: bool,
+    pub dry_run: bool,
 
     /// The url of torrents to transcode
-    urls: Vec<String>,
+    pub urls: Vec<String>,
 }
 
 const SUCCESS: &str = "[✅]";
@@ -136,24 +134,7 @@ async fn main() -> anyhow::Result<()> {
 async fn transcode(mut cmd: TranscodeCommand) -> anyhow::Result<()> {
     let term = Term::stdout();
 
-    if let Some(config_path) = &cmd.config_file {
-        let mut file = File::open(config_path).await?;
-        let mut contents = vec![];
-        file.read_to_end(&mut contents).await?;
-        let config: RedOxideConfig = serde_json::from_slice(&*contents)?;
-        if cmd.api_key.is_none() {
-            cmd.api_key = Some(config.api_key);
-        }
-    }
-
-    if cmd.api_key.is_none() {
-        term.write_line(&format!(
-            "{} You have to specify API key either as argument or in the config file",
-            ERROR
-        ))?;
-
-        return Ok(());
-    }
+    apply_config(&mut cmd, &term).await?;
 
     if cmd.threads.is_none() {
         cmd.threads = Some(num_cpus::get() as u32);
@@ -172,7 +153,7 @@ async fn transcode(mut cmd: TranscodeCommand) -> anyhow::Result<()> {
             url.as_str(),
             &term,
             &mut api,
-            &mut cmd,
+            cmd.clone(),
             index_response.passkey.clone(),
         )
         .await?;
@@ -185,7 +166,7 @@ async fn handle_url(
     url: &str,
     term: &Term,
     api: &mut RedactedApi,
-    cmd: &mut TranscodeCommand,
+    mut cmd: TranscodeCommand,
     passkey: String,
 ) -> anyhow::Result<()> {
     lazy_static! {
@@ -335,7 +316,9 @@ async fn handle_url(
         format!("{} - {} [{}]", artist, group_name, year)
     };
 
-    let flac_path = cmd.content_directory.join(torrent.file_path.clone());
+    let content_directory = cmd.content_directory.unwrap();
+
+    let flac_path = content_directory.join(torrent.file_path.clone());
 
     let media = Media::from(&*torrent.media);
 
@@ -385,11 +368,13 @@ async fn handle_url(
         tokio::fs::remove_file(&tmp).await?;
     }
 
+    let spectrogram_directory = cmd.spectrogram_directory.unwrap();
+
     if !cmd.skip_spectrogram {
         let flacs = get_all_files_with_extension(&flac_path, ".flac").await?;
 
         let parent = flac_path.file_name().unwrap().to_str().unwrap();
-        let to_create = cmd.spectrogram_directory.join(parent);
+        let to_create = spectrogram_directory.join(parent);
 
         tokio::fs::create_dir_all(&to_create).await?;
 
@@ -397,21 +382,21 @@ async fn handle_url(
             spectrogram::spectrogram::make_spectrogram_zoom(
                 &flac_path,
                 &flac,
-                &cmd.spectrogram_directory,
+                &spectrogram_directory,
             )
             .await?;
 
             spectrogram::spectrogram::make_spectrogram_full(
                 &flac_path,
                 &flac,
-                &cmd.spectrogram_directory,
+                &spectrogram_directory,
             )
             .await?;
         }
 
         let mut prompt = Confirm::new();
 
-        prompt.with_prompt(format!("{} Created Spectrograms at {}, please manual check if FLAC is lossless before continuing!", PAUSE, cmd.spectrogram_directory.to_str().unwrap())).default(true);
+        prompt.with_prompt(format!("{} Created Spectrograms at {}, please manual check if FLAC is lossless before continuing!", PAUSE, spectrogram_directory.to_str().unwrap())).default(true);
 
         let response = prompt.interact()?;
 
@@ -445,6 +430,8 @@ async fn handle_url(
 
     m.println("[➡️] Transcoding...").unwrap();
 
+    let transcode_directory = cmd.transcode_directory.unwrap();
+
     for format in &transcode_formats {
         let pb = m.add(ProgressBar::new(files));
         pb.set_style(sty.clone());
@@ -467,7 +454,7 @@ async fn handle_url(
         let threads = cmd.threads.clone().unwrap();
         let torrent_id_clone = torrent_id.clone();
         let term = Arc::new(term.clone());
-        let mut output_dir = cmd.transcode_directory.clone();
+        let mut output_dir = transcode_directory.clone();
         let format = format.clone();
         join_set.spawn(tokio::spawn(async move {
             let (folder_path, command) = transcode_release(
@@ -516,12 +503,12 @@ async fn handle_url(
         prompt.interact()?;
     }
 
+    let torrent_directory = cmd.torrent_directory.unwrap();
+
     for (path, format, command) in &path_format_command_triple {
         let release_name = path.file_name().unwrap().to_str().unwrap();
 
-        let torrent_path = cmd
-            .torrent_directory
-            .join(release_name.to_owned() + ".torrent");
+        let torrent_path = torrent_directory.join(release_name.to_owned() + ".torrent");
 
         imdl::torrent::create_torrent(
             path,
@@ -555,11 +542,7 @@ async fn handle_url(
         };
 
         if cmd.move_transcode_to_content {
-            tokio::fs::rename(
-                &path,
-                &cmd.content_directory.join(path.file_name().unwrap()),
-            )
-            .await?;
+            tokio::fs::rename(&path, &content_directory.join(path.file_name().unwrap())).await?;
 
             term.write_line(&format!(
                 "{} Moved transcode release to content directory",
