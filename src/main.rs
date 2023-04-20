@@ -7,6 +7,7 @@ use std::sync::Arc;
 use clap::{arg, Parser, Subcommand};
 use console::Term;
 use dialoguer::Confirm;
+use html_escape::decode_html_entities;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use lazy_static::lazy_static;
 use redacted::util::create_description;
@@ -318,7 +319,7 @@ async fn handle_url(
 
     let content_directory = cmd.content_directory.unwrap();
 
-    let flac_path = content_directory.join(torrent.file_path.clone());
+    let flac_path = content_directory.join(decode_html_entities(&torrent.file_path).to_string());
 
     let media = Media::from(&*torrent.media);
 
