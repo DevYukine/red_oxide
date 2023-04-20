@@ -1,31 +1,41 @@
+// Windows
+#[cfg(target_os = "windows")]
 pub fn get_flac_executable() -> String {
-    if cfg!(target_os = "windows") {
-        "flac.exe".to_string()
-    } else {
-        "flac".to_string()
-    }
+    return "flac.exe".to_string()
 }
 
+#[cfg(target_os = "windows")]
 pub fn get_sox_executable() -> String {
-    if cfg!(target_os = "windows") {
-        "sox.exe".to_string()
-    } else {
-        "sox".to_string()
-    }
+    return "sox.exe".to_string()
 }
 
-pub fn get_lame_executable() -> String {
-    if cfg!(target_os = "windows") {
-        "lame.exe".to_string()
-    } else {
-        "lame".to_string()
-    }
+#[cfg(target_os = "windows")]
+pub fn get_lame_executable() -> String{
+    return "lame.exe".to_string()
 }
 
+#[cfg(target_os = "windows")]
 pub fn get_imdl_executable_name() -> String {
-    if cfg!(target_os = "windows") {
-        "imdl.exe".to_string()
-    } else {
-        "imdl".to_string()
-    }
+    return "imdl.exe".to_string()
+}
+
+// Linux or Mac
+#[cfg(not(target_os = "windows"))]
+pub fn get_flac_executable() -> String {
+    return "flac".to_string()
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn get_sox_executable() -> String {
+    return "sox".to_string()
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn get_lame_executable() -> String {
+    return "lame".to_string()
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn get_imdl_executable_name() -> String {
+    return "imdl".to_string()
 }
