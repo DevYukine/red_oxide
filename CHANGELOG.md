@@ -1,3 +1,18 @@
+# [0.4.0](https://github.com/DevYukine/red_oxide/compare/v0.3.0...v0.4.0) (2023-04-20)
+
+
+### Bug Fixes
+
+* **path:** correctly parse reds file_path property for utf-8 chars ([342d6dc](https://github.com/DevYukine/red_oxide/commit/342d6dc1788681fe681acd9b80b48aaab4b2f73d))
+* **spectrograms:** correct error message ([18035b4](https://github.com/DevYukine/red_oxide/commit/18035b48d3b6f48c13b4e1a6b0ca425be7b4e449))
+
+
+### Features
+
+* **spectrogram:** add progress bar for spectrogram creation ([386682d](https://github.com/DevYukine/red_oxide/commit/386682d17ebd192aa7d4905fdd9720834a89c62e))
+
+
+
 # [0.3.0](https://github.com/DevYukine/red_oxide/compare/v0.2.0...v0.3.0) (2023-04-19)
 
 
