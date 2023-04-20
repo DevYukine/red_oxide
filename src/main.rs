@@ -7,6 +7,7 @@ use std::sync::Arc;
 use clap::{arg, Parser, Subcommand};
 use console::Term;
 use dialoguer::Confirm;
+use html_escape::decode_html_entities;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use lazy_static::lazy_static;
 use redacted::util::create_description;
@@ -18,7 +19,7 @@ use tokio::task::JoinSet;
 use crate::config::config::apply_config;
 use transcode::transcode::transcode_release;
 
-use crate::fs::util::{count_files_with_extension, get_all_files_with_extension};
+use crate::fs::util::get_all_files_with_extension;
 use crate::redacted::api::client::RedactedApi;
 use crate::redacted::api::constants::TRACKER_URL;
 use crate::redacted::models::{Category, Media, ReleaseType};
@@ -318,7 +319,7 @@ async fn handle_url(
 
     let content_directory = cmd.content_directory.unwrap();
 
-    let flac_path = content_directory.join(torrent.file_path.clone());
+    let flac_path = content_directory.join(decode_html_entities(&torrent.file_path).to_string());
 
     let media = Media::from(&*torrent.media);
 
@@ -369,9 +370,19 @@ async fn handle_url(
     }
 
     let spectrogram_directory = cmd.spectrogram_directory.unwrap();
+    let flacs = get_all_files_with_extension(&flac_path, ".flac").await?;
+    let flacs_count = flacs.len();
 
     if !cmd.skip_spectrogram {
-        let flacs = get_all_files_with_extension(&flac_path, ".flac").await?;
+        let pb = ProgressBar::new(flacs_count as u64);
+
+        pb.set_style(
+            ProgressStyle::with_template("[{spinner:.blue}] [{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos:>7}/{len:7} File(s)")?
+                .tick_strings(&["-", "\\", "|", "/"])
+                .progress_chars("#>-"),
+        );
+
+        pb.set_message("Creating Spectrograms... (This may take a while)");
 
         let parent = flac_path.file_name().unwrap().to_str().unwrap();
         let to_create = spectrogram_directory.join(parent);
@@ -392,11 +403,19 @@ async fn handle_url(
                 &spectrogram_directory,
             )
             .await?;
+
+            pb.inc(1);
         }
 
         let mut prompt = Confirm::new();
 
-        prompt.with_prompt(format!("{} Created Spectrograms at {}, please manual check if FLAC is lossless before continuing!", PAUSE, spectrogram_directory.to_str().unwrap())).default(true);
+        pb.finish_and_clear();
+
+        term.write_line(&*format!("{} Created Spectrograms at {}, please manual check if FLAC is lossless before continuing!", PAUSE, to_create.to_str().unwrap()))?;
+
+        prompt
+            .with_prompt("Do those spectrograms look good?")
+            .default(true);
 
         let response = prompt.interact()?;
 
@@ -426,14 +445,12 @@ async fn handle_url(
 
     let mut join_set = JoinSet::new();
 
-    let files = count_files_with_extension(&flac_path, ".flac").await?;
-
     m.println("[➡️] Transcoding...").unwrap();
 
     let transcode_directory = cmd.transcode_directory.unwrap();
 
     for format in &transcode_formats {
-        let pb = m.add(ProgressBar::new(files));
+        let pb = m.add(ProgressBar::new(flacs_count as u64));
         pb.set_style(sty.clone());
 
         let transcode_format_str = match format {

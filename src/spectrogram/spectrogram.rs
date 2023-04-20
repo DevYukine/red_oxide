@@ -48,7 +48,7 @@ pub async fn make_spectrogram_zoom(
     if output.status.success() {
         Ok(())
     } else {
-        Err(anyhow::anyhow!("Failed to create torrent"))
+        Err(anyhow::anyhow!("Failed to create spectrogram"))
     }
 }
 
