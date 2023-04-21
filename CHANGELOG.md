@@ -1,3 +1,18 @@
+# [0.5.0](https://github.com/DevYukine/red_oxide/compare/v0.4.0...v0.5.0) (2023-04-21)
+
+
+### Bug Fixes
+
+* **redacted:** correct Blu-ray -> Blu-Ray for api response ([aa72cb1](https://github.com/DevYukine/red_oxide/commit/aa72cb12604ee01a128c69f26f7056108791062e))
+
+
+### Features
+
+* **threads:** remove useless threads argument ([9cc7be8](https://github.com/DevYukine/red_oxide/commit/9cc7be8c937493f92092cfa26e28b872242388b8))
+* **transcode:** add total progress bar, fix ghost bar showing up ([ba947c0](https://github.com/DevYukine/red_oxide/commit/ba947c0614e5cd161b3f70174e0c43ccea142074))
+
+
+
 # [0.4.0](https://github.com/DevYukine/red_oxide/compare/v0.3.0...v0.4.0) (2023-04-20)
 
 
