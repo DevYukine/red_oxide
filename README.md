@@ -68,6 +68,15 @@ This is useful if you don't want a super long CLI command and your configs do no
 
 ```
 
+### Notes for people using sox under windows
+
+if you use the binaries from [here](https://sourceforge.net/projects/sox/files/sox/), and you want utf-8 support for paths (this is needed for Japanese/Chinese/Korean names in paths for example) you have to download the files from [here](https://anonfiles.com/g7i1G1m8z5/sox_windows_fix_zip) and follow the steps below
+
+1. Extract the files from the zip
+2. Run the PreferExternalManifest.reg file and let it overwrite the registry entry
+3. Copy the sox.exe.manifest file to the folder where sox.exe is located
+4. Enjoy sox working with utf-8 paths :)
+
 ## Built With
 
 - [Rust](https://www.rust-lang.org/) - The language used
