@@ -369,9 +369,10 @@ async fn handle_url(
         let pb = ProgressBar::new(flacs_count as u64);
 
         pb.set_style(
-            ProgressStyle::with_template("[{spinner:.blue}] [{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos:>7}/{len:7} File(s)")?
-                .tick_strings(&["-", "\\", "|", "/"])
-                .progress_chars("#>-"),
+            ProgressStyle::with_template(
+                "[{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos:>7}/{len:7} File(s)",
+            )?
+            .progress_chars("#>-"),
         );
 
         pb.set_message("Creating Spectrograms... (This may take a while)");
