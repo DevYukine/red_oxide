@@ -64,10 +64,6 @@ pub struct TranscodeCommand {
     #[arg(long, short, default_value = "false")]
     pub automatic_upload: bool,
 
-    /// The number of THREADS to use, defaults to the amount of cores available
-    #[arg(long, short)]
-    pub threads: Option<u32>,
-
     /// If multiple formats should be transcoded in parallel
     #[arg(long, default_value = "false")]
     pub transcode_in_parallel: bool,
@@ -136,10 +132,6 @@ async fn transcode(mut cmd: TranscodeCommand) -> anyhow::Result<()> {
     let term = Term::stdout();
 
     apply_config(&mut cmd, &term).await?;
-
-    if cmd.threads.is_none() {
-        cmd.threads = Some(num_cpus::get() as u32);
-    }
 
     let mut api = RedactedApi::new(cmd.api_key.clone().unwrap());
     let index_response = api.index().await?.response;
@@ -468,7 +460,6 @@ async fn handle_url(
         );
 
         let flac_path_clone = flac_path.clone();
-        let threads = cmd.threads.clone().unwrap();
         let torrent_id_clone = torrent_id.clone();
         let term = Arc::new(term.clone());
         let mut output_dir = transcode_directory.clone();
@@ -479,7 +470,6 @@ async fn handle_url(
                 &mut output_dir,
                 transcode_release_name.clone(),
                 format,
-                threads,
                 term,
                 torrent_id_clone,
                 pb,

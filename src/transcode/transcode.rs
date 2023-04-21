@@ -26,7 +26,6 @@ pub async fn transcode_release(
     output_dir: &mut PathBuf,
     folder_name: String,
     format: ReleaseType,
-    threads: u32,
     term: Arc<Term>,
     torrent_id: i64,
     pb: ProgressBar,
