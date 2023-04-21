@@ -28,7 +28,8 @@ pub async fn transcode_release(
     format: ReleaseType,
     term: Arc<Term>,
     torrent_id: i64,
-    pb: ProgressBar,
+    pb_format: ProgressBar,
+    pb_main: ProgressBar,
 ) -> anyhow::Result<(PathBuf, String)> {
     let needs_resample = util::is_24_bit_flac(flac_dir).await?;
 
@@ -54,14 +55,15 @@ pub async fn transcode_release(
 
     let paths = get_all_files_with_extension(&flac_dir, ".flac").await?;
 
-    pb.set_message(format!("{} transcoding", format));
+    pb_format.set_message(format!("{} transcoding", format));
 
     let mut command = "".to_string();
 
     let mut join_set = JoinSet::new();
     for path in paths {
-        let pb = pb.clone();
+        let pb = pb_format.clone();
         let output_dir = output_dir.clone();
+        let pb_main = pb_main.clone();
         join_set.spawn(async move {
             let (output_path, command) = transcode(&path, &output_dir, format).await?;
 
@@ -70,6 +72,7 @@ pub async fn transcode_release(
             }
 
             pb.inc(1);
+            pb_main.inc(1);
 
             Ok::<String, anyhow::Error>(command)
         });
@@ -79,7 +82,7 @@ pub async fn transcode_release(
         command = res??;
     }
 
-    pb.finish_with_message(format!("{} transcoding done", format));
+    pb_format.finish_with_message(format!("{} transcoding done", format));
 
     Ok((output_dir.to_owned(), command))
 }

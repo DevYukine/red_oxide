@@ -429,22 +429,31 @@ async fn handle_url(
         return Ok(());
     }
 
-    let m = MultiProgress::with_draw_target(ProgressDrawTarget::stdout());
+    let multi_progress = MultiProgress::with_draw_target(ProgressDrawTarget::stdout());
     let sty = ProgressStyle::with_template(
         "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
     )
     .unwrap()
     .progress_chars("##-");
 
+    let pb_main = multi_progress.add(ProgressBar::new(
+        (flacs_count * transcode_formats.len()) as u64,
+    ));
+    pb_main.set_style(sty.clone());
+    pb_main.set_message("Total");
+
+    pb_main.tick();
+
     let mut join_set = JoinSet::new();
 
-    m.println("[➡️] Transcoding...").unwrap();
+    multi_progress.println("[➡️] Transcoding...").unwrap();
 
     let transcode_directory = cmd.transcode_directory.unwrap();
 
     for format in &transcode_formats {
-        let pb = m.add(ProgressBar::new(flacs_count as u64));
-        pb.set_style(sty.clone());
+        let pb_format =
+            multi_progress.insert_before(&pb_main, ProgressBar::new(flacs_count as u64));
+        pb_format.set_style(sty.clone());
 
         let transcode_format_str = match format {
             ReleaseType::Flac24 => "FLAC 24bit",
@@ -465,6 +474,7 @@ async fn handle_url(
         let term = Arc::new(term.clone());
         let mut output_dir = transcode_directory.clone();
         let format = format.clone();
+        let pb_main_clone = pb_main.clone();
         join_set.spawn(tokio::spawn(async move {
             let (folder_path, command) = transcode_release(
                 &flac_path_clone,
@@ -473,7 +483,8 @@ async fn handle_url(
                 format,
                 term,
                 torrent_id_clone,
-                pb,
+                pb_format,
+                pb_main_clone,
             )
             .await?;
 
@@ -498,8 +509,8 @@ async fn handle_url(
         path_format_command_triple.push(transcode_folder);
     }
 
-    m.println(format!("{} Transcoding Done!", SUCCESS))?;
-    m.clear()?;
+    multi_progress.println(format!("{} Transcoding Done!", SUCCESS))?;
+    multi_progress.clear()?;
 
     if invalid_track_number_vinyl {
         let mut prompt = Confirm::new();
