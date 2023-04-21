@@ -64,7 +64,7 @@ pub struct TranscodeCommand {
     #[arg(long, short, default_value = "false")]
     pub automatic_upload: bool,
 
-    /// If multiple formats should be transcoded in parallel
+    /// If multiple formats should be transcoded in parallel (this will increase memory & cpu usage a lot, make sure you can handle it)
     #[arg(long, default_value = "false")]
     pub transcode_in_parallel: bool,
 
