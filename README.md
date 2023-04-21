@@ -12,6 +12,8 @@ CLI to help uploading to REDactec, inspired by REDBetter.
 
 ### CLI
 
+#### Transcode subcommand (red_oxide transcode)
+
 You have to specify api-key, torrent-directory, content-directory, transcode-directory & spectrogram-directory either via the config file or via the CLI
 
 ```
