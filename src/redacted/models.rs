@@ -165,7 +165,7 @@ impl From<&str> for Media {
             "DAT" => Media::DAT,
             "Cassette" => Media::Cassette,
             "WEB" => Media::WEB,
-            "Blu-ray" => Media::BluRay,
+            "Blu-Ray" => Media::BluRay,
             _ => panic!("Unknown media: {}, please report this to Github", value),
         }
     }
