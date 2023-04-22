@@ -111,3 +111,42 @@ jobs:
           asset_path: target/${{ matrix.target }}/release/red_oxide.exe
           asset_name: red_oxide_${{ runner.OS }}_${{ matrix.target }}.exe
           asset_content_type: application/vnd.microsoft.portable-executable
+
+  macos:
+    name: MacOS Build
+    runs-on: macos-latest
+    needs: changelog
+    strategy:
+      matrix:
+        target: [x86_64-apple-darwin, aarch64-apple-darwin]
+    steps:
+      - name: Checkout Source code
+        uses: actions/checkout@v3
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+      - name: Build target
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --target ${{ matrix.target }}
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.changelog.outputs.upload_url }}
+          asset_path: target/${{ matrix.target }}/release/red_oxide
+          asset_name: red_oxide_${{ runner.OS }}_${{ matrix.target }}
+          asset_content_type: application/x-elf
