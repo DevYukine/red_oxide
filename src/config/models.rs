@@ -1,3 +1,4 @@
+use crate::redacted::models::ReleaseType;
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -13,4 +14,5 @@ pub struct RedOxideConfig {
     pub automatic_upload: Option<bool>,
     pub skip_hash_check: Option<bool>,
     pub skip_spectrogram: Option<bool>,
+    pub allowed_transcode_formats: Option<Vec<ReleaseType>>,
 }

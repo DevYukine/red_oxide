@@ -92,6 +92,10 @@ pub struct TranscodeCommand {
     #[arg(long, short)]
     pub config_file: Option<PathBuf>,
 
+    /// List of allowed formats to transcode to, defaults to all formats if omitted
+    #[arg(long, short = 'f')]
+    pub allowed_transcode_formats: Vec<ReleaseType>,
+
     /// If the transcode should be moved to the content directory, useful when you want to start seeding right after you upload
     #[arg(long, short, default_value = "false")]
     pub move_transcode_to_content: bool,
@@ -261,14 +265,17 @@ async fn handle_url(
     let mut transcode_formats = Vec::new();
 
     ReleaseType::iter().for_each(|release_type| {
-        if !existing_formats.contains(&release_type) && release_type != ReleaseType::Flac24 {
+        if !existing_formats.contains(&release_type)
+            && release_type != ReleaseType::Flac24
+            && cmd.allowed_transcode_formats.contains(&release_type)
+        {
             transcode_formats.push(release_type);
         }
     });
 
     if transcode_formats.is_empty() {
         term.write_line(&format!(
-            "{} Torrent {} in group {} has all formats already... skipping",
+            "{} Torrent {} in group {} has all possible/wanted formats already... skipping",
             WARNING, torrent_id, group_id
         ))?;
         return Ok(());

@@ -1,11 +1,15 @@
 use std::fmt;
 
+use clap::ValueEnum;
 use derivative::Derivative;
+use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-#[derive(Debug, PartialEq, Eq, EnumIter, Derivative, Clone, Copy)]
+#[derive(
+    Debug, PartialEq, Eq, EnumIter, Derivative, Clone, Copy, Serialize, Deserialize, ValueEnum,
+)]
 #[derivative(Hash)]
 pub enum ReleaseType {
     Flac24,

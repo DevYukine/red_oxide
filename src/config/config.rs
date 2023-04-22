@@ -1,4 +1,5 @@
 use crate::config::models::RedOxideConfig;
+use crate::redacted::models::ReleaseType::{Flac, Mp3320, Mp3V0};
 use crate::{TranscodeCommand, ERROR};
 use console::Term;
 use tokio::fs::File;
@@ -46,6 +47,10 @@ pub async fn apply_config(cmd: &mut TranscodeCommand, term: &Term) -> anyhow::Re
         if let Some(skip_spectrogram) = &config.skip_spectrogram {
             cmd.skip_spectrogram = *skip_spectrogram;
         }
+
+        if let Some(allowed_transcode_formats) = &config.allowed_transcode_formats {
+            cmd.allowed_transcode_formats = allowed_transcode_formats.clone();
+        }
     }
 
     verify_final_config(cmd, term)?;
@@ -53,7 +58,7 @@ pub async fn apply_config(cmd: &mut TranscodeCommand, term: &Term) -> anyhow::Re
     Ok(())
 }
 
-pub fn verify_final_config(cmd: &TranscodeCommand, term: &Term) -> anyhow::Result<()> {
+pub fn verify_final_config(cmd: &mut TranscodeCommand, term: &Term) -> anyhow::Result<()> {
     if cmd.api_key.is_none() {
         term.write_line(&format!(
             "{} You have to specify API key either as argument or in the config file",
@@ -92,6 +97,10 @@ pub fn verify_final_config(cmd: &TranscodeCommand, term: &Term) -> anyhow::Resul
             ERROR
         ))?;
         std::process::exit(1);
+    }
+
+    if cmd.allowed_transcode_formats.is_empty() {
+        cmd.allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
     }
 
     Ok(())
