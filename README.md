@@ -1,6 +1,6 @@
 # red_oxide
 
-CLI to help uploading to REDactec, inspired by REDBetter.
+CLI to help uploading to REDacted, inspired by REDBetter.
 
 ## Installing
 
