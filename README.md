@@ -17,8 +17,12 @@ CLI to help uploading to REDacted, inspired by REDBetter.
 You have to specify api-key, torrent-directory, content-directory, transcode-directory & spectrogram-directory either via the config file or via the CLI
 
 ```
+Transcode FLACs to other co-existing formats
+
+Usage: red_oxide transcode [OPTIONS] [URLS]...
+
 Arguments:
-  [URLS]...  The perma links of torrents to transcode
+  [URLS]...  The Perma URLs (PL's) of torrents to transcode
 
 Options:
       --debug
@@ -39,6 +43,8 @@ Options:
           The path to the directory where the spectrograms should be stored
   -c, --config-file <CONFIG_FILE>
           The path to the config file
+  -f, --allowed-transcode-formats <ALLOWED_TRANSCODE_FORMATS>
+          List of allowed formats to transcode to, defaults to all formats if omitted [possible values: flac24, flac, mp3320, mp3-v0]
   -m, --move-transcode-to-content
           If the transcode should be moved to the content directory, useful when you want to start seeding right after you upload
       --skip-hash-check
