@@ -1,3 +1,18 @@
+# [0.6.0](https://github.com/DevYukine/red_oxide/compare/v0.5.0...v0.6.0) (2023-04-23)
+
+
+### Bug Fixes
+
+* **redacted:** check if files exceed redacteds allowed path limit ([020afab](https://github.com/DevYukine/red_oxide/commit/020afabfda15655c00f6dee6b869fc1b0f65c593))
+
+
+### Features
+
+* add way to set allowed transcode targets in cli & via the config ([90d2b02](https://github.com/DevYukine/red_oxide/commit/90d2b0261345ab3fcb8d7c439419272f3d86a7c3))
+* **redacted:** add version to upload description ([3b56f9d](https://github.com/DevYukine/red_oxide/commit/3b56f9d0e4dd48346bacf4bc80b201bf78715711))
+
+
+
 # [0.5.0](https://github.com/DevYukine/red_oxide/compare/v0.4.0...v0.5.0) (2023-04-21)
 
 
