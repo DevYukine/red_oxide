@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use clap::{arg, Parser, Subcommand};
 use console::Term;
-use dialoguer::Confirm;
+use dialoguer::{Confirm, Input};
 use html_escape::decode_html_entities;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use lazy_static::lazy_static;
@@ -22,6 +22,7 @@ use transcode::transcode::transcode_release;
 use crate::fs::util::get_all_files_with_extension;
 use crate::redacted::api::client::RedactedApi;
 use crate::redacted::api::constants::TRACKER_URL;
+use crate::redacted::api::path::is_path_exceeding_redacted_path_limit;
 use crate::redacted::models::{Category, Media, ReleaseType};
 use crate::redacted::upload::TorrentUploadData;
 use crate::redacted::util::perma_link;
@@ -533,6 +534,22 @@ async fn handle_url(
 
     for (path, format, command) in &path_format_command_triple {
         let release_name = path.file_name().unwrap().to_str().unwrap();
+        let mut exceeds_red_path_length = is_path_exceeding_redacted_path_limit(&path).await?;
+
+        while exceeds_red_path_length {
+            let mut editor = Input::new();
+
+            let edited_text = editor
+                .with_prompt(format!(
+                    "{} Folder Name {} is too long for RED, please shorten the folder name\n",
+                    ERROR, release_name
+                ))
+                .default(release_name.to_string())
+                .interact_text()?;
+
+            let new_path = path.parent().unwrap().join(edited_text);
+            exceeds_red_path_length = is_path_exceeding_redacted_path_limit(&new_path).await?;
+        }
 
         let torrent_path = torrent_directory.join(release_name.to_owned() + ".torrent");
 
