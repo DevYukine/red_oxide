@@ -113,7 +113,7 @@ pub struct TranscodeCommand {
     #[arg(long, short, default_value = "false")]
     pub dry_run: bool,
 
-    /// The url of torrents to transcode
+    /// The Perma URLs (PL's) of torrents to transcode
     pub urls: Vec<String>,
 }
 
