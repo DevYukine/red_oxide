@@ -2,7 +2,7 @@ use std::str;
 use std::time::Duration;
 
 use anyhow::Error;
-use reqwest::{Client, Method, Request, Response, Url};
+use reqwest::{Client, Method, Response, Url};
 use serde::de::DeserializeOwned;
 use tower::limit::RateLimit;
 use tower::{Service, ServiceExt};
@@ -47,7 +47,11 @@ impl RedactedApi {
     }
 
     pub async fn index(&mut self) -> anyhow::Result<ApiResponse<IndexResponse>> {
-        let req = Request::new(Method::POST, Url::parse(&(API_URL.to_owned() + "index"))?);
+        let req = self
+            .client
+            .request(Method::GET, Url::parse(API_URL)?)
+            .query(&vec![("action", "index")])
+            .build()?;
 
         let res = self.service.ready().await?.call(req).await?;
 
@@ -60,10 +64,14 @@ impl RedactedApi {
         &mut self,
         torrent_id: i64,
     ) -> anyhow::Result<ApiResponse<TorrentResponse>> {
-        let req = Request::new(
-            Method::GET,
-            Url::parse(&(API_URL.to_owned() + &format!("torrent&id={}", torrent_id.to_string())))?,
-        );
+        let req = self
+            .client
+            .request(Method::GET, Url::parse(API_URL)?)
+            .query(&vec![
+                ("action", "torrent"),
+                ("id", torrent_id.to_string().as_str()),
+            ])
+            .build()?;
 
         let res = self.service.ready().await?.call(req).await?;
 
@@ -76,12 +84,14 @@ impl RedactedApi {
         &mut self,
         group_id: i64,
     ) -> anyhow::Result<ApiResponse<TorrentGroupResponse>> {
-        let req = Request::new(
-            Method::GET,
-            Url::parse(
-                &(API_URL.to_owned() + &format!("torrentgroup&id={}", group_id.to_string())),
-            )?,
-        );
+        let req = self
+            .client
+            .request(Method::GET, Url::parse(API_URL)?)
+            .query(&vec![
+                ("action", "torrentgroup"),
+                ("id", group_id.to_string().as_str()),
+            ])
+            .build()?;
 
         let res = self.service.ready().await?.call(req).await?;
 
@@ -91,10 +101,14 @@ impl RedactedApi {
     }
 
     pub async fn download_torrent(&mut self, torrent_id: i64) -> anyhow::Result<Vec<u8>> {
-        let req = Request::new(
-            Method::GET,
-            Url::parse(&(API_URL.to_owned() + &format!("download&id={}", torrent_id.to_string())))?,
-        );
+        let req = self
+            .client
+            .request(Method::GET, Url::parse(API_URL)?)
+            .query(&vec![
+                ("action", "download"),
+                ("id", torrent_id.to_string().as_str()),
+            ])
+            .build()?;
 
         let res = self.service.ready().await?.call(req).await?;
 
@@ -109,7 +123,8 @@ impl RedactedApi {
 
         let req = self
             .client
-            .request(Method::POST, Url::parse(&(API_URL.to_owned() + "upload"))?)
+            .request(Method::POST, Url::parse(API_URL)?)
+            .query(&vec![("action", "upload")])
             .multipart(form)
             .build()?;
 
