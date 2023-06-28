@@ -174,7 +174,16 @@ async fn handle_url(
         .unwrap();
     }
 
-    let captures = RE.captures(url).unwrap();
+    let captures = match RE.captures(url) {
+        None => {
+            term.write_line(&format!(
+                "{} Could not parse permalink {}, please make sure you are using a valid permalink including group id and torrent id",
+                ERROR, url
+            ))?;
+            return Ok(());
+        }
+        Some(c) => c,
+    };
 
     let group_id = captures.get(2).unwrap().as_str().parse::<i64>().unwrap();
     let torrent_id = captures.get(3).unwrap().as_str().parse::<i64>().unwrap();
