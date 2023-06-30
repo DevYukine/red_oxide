@@ -430,18 +430,17 @@ async fn handle_url(
                     Ok::<(), anyhow::Error>(())
                 });
 
-                let semaphore = Arc::clone(&semaphore);
-                let spectrogram_directory = spectrogram_directory.clone();
-                let flac_path = flac_path.clone();
-                let flac = flac.clone();
-
+                let semaphore_clone = Arc::clone(&semaphore);
+                let spectrogram_directory_clone = spectrogram_directory.clone();
+                let flac_path_clone = flac_path.clone();
+                let flac_clone = flac.clone();
                 join_set.spawn(async move {
-                    let _permit = semaphore.acquire().await.unwrap();
+                    let _permit = semaphore_clone.acquire().await.unwrap();
 
                     spectrogram::spectrogram::make_spectrogram_full(
-                        &flac_path,
-                        &flac,
-                        &spectrogram_directory,
+                        &flac_path_clone,
+                        &flac_clone,
+                        &spectrogram_directory_clone,
                     )
                     .await?;
 
