@@ -8,7 +8,7 @@ use indicatif::ProgressBar;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
-use tokio::task::JoinSet;
+use tokio::sync::Semaphore;
 
 use crate::fs::util::get_all_files_with_extension;
 use crate::redacted::models::ReleaseType;
@@ -30,6 +30,7 @@ pub async fn transcode_release(
     torrent_id: i64,
     pb_format: ProgressBar,
     pb_main: ProgressBar,
+    semaphore_clone: Arc<Semaphore>,
 ) -> anyhow::Result<(PathBuf, String)> {
     let needs_resample = util::is_24_bit_flac(flac_dir).await?;
 
@@ -59,12 +60,14 @@ pub async fn transcode_release(
 
     let mut command = "".to_string();
 
-    let mut join_set = JoinSet::new();
+    let mut handles = vec![];
     for path in paths {
         let pb = pb_format.clone();
         let output_dir = output_dir.clone();
         let pb_main = pb_main.clone();
-        join_set.spawn(async move {
+        let semaphore_clone = semaphore_clone.clone();
+        handles.push(tokio::spawn(async move {
+            let _permit = semaphore_clone.acquire().await?;
             let (output_path, command) = transcode(&path, &output_dir, format).await?;
 
             if format != Flac {
@@ -75,11 +78,11 @@ pub async fn transcode_release(
             pb_main.inc(1);
 
             Ok::<String, anyhow::Error>(command)
-        });
+        }));
     }
 
-    while let Some(res) = join_set.join_next().await {
-        command = res??;
+    for handle in handles {
+        command = handle.await??;
     }
 
     pb_format.finish_with_message(format!("{} transcoding done", format));

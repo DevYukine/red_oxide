@@ -51,6 +51,10 @@ pub async fn apply_config(cmd: &mut TranscodeCommand, term: &Term) -> anyhow::Re
         if let Some(allowed_transcode_formats) = &config.allowed_transcode_formats {
             cmd.allowed_transcode_formats = allowed_transcode_formats.clone();
         }
+
+        if let Some(concurrency) = &config.concurrency {
+            cmd.concurrency = Some(*concurrency);
+        }
     }
 
     verify_final_config(cmd, term)?;
@@ -101,6 +105,10 @@ pub fn verify_final_config(cmd: &mut TranscodeCommand, term: &Term) -> anyhow::R
 
     if cmd.allowed_transcode_formats.is_empty() {
         cmd.allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
+    }
+
+    if cmd.concurrency.is_none() {
+        cmd.concurrency = Some(num_cpus::get());
     }
 
     Ok(())

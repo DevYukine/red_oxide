@@ -14,6 +14,7 @@ use redacted::util::create_description;
 use regex::Regex;
 use strum::IntoEnumIterator;
 use tags::util::valid_tags;
+use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
 use crate::config::config::apply_config;
@@ -65,9 +66,9 @@ pub struct TranscodeCommand {
     #[arg(long, short, default_value = "false")]
     pub automatic_upload: bool,
 
-    /// If multiple formats should be transcoded in parallel (this will increase memory & cpu usage a lot, make sure you can handle it)
-    #[arg(long, default_value = "false")]
-    pub transcode_in_parallel: bool,
+    /// How many tasks (for transcoding as example) should be run in parallel, defaults to your CPU count
+    #[arg(long)]
+    pub concurrency: Option<usize>,
 
     /// The Api key from Redacted to use there API with
     #[arg(long)]
@@ -461,6 +462,7 @@ async fn handle_url(
 
     pb_main.tick();
 
+    let semaphore = Arc::new(Semaphore::new(cmd.concurrency.unwrap()));
     let mut join_set = JoinSet::new();
 
     multi_progress.println("[➡️] Transcoding...").unwrap();
@@ -492,6 +494,7 @@ async fn handle_url(
         let mut output_dir = transcode_directory.clone();
         let format = format.clone();
         let pb_main_clone = pb_main.clone();
+        let semaphore_clone = semaphore.clone();
         join_set.spawn(tokio::spawn(async move {
             let (folder_path, command) = transcode_release(
                 &flac_path_clone,
@@ -502,6 +505,7 @@ async fn handle_url(
                 torrent_id_clone,
                 pb_format,
                 pb_main_clone,
+                semaphore_clone,
             )
             .await?;
 

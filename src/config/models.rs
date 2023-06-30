@@ -15,4 +15,5 @@ pub struct RedOxideConfig {
     pub skip_hash_check: Option<bool>,
     pub skip_spectrogram: Option<bool>,
     pub allowed_transcode_formats: Option<Vec<ReleaseType>>,
+    pub concurrency: Option<usize>,
 }
