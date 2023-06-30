@@ -400,22 +400,66 @@ async fn handle_url(
 
         tokio::fs::create_dir_all(&to_create).await?;
 
+        let semaphore = Arc::new(Semaphore::new(cmd.concurrency.unwrap()));
+        let mut tasks = vec![];
+
         for flac in flacs {
-            spectrogram::spectrogram::make_spectrogram_zoom(
-                &flac_path,
-                &flac,
-                &spectrogram_directory,
-            )
-            .await?;
+            let semaphore = Arc::clone(&semaphore);
+            let spectrogram_directory = spectrogram_directory.clone();
+            let flac_path = flac_path.clone();
+            let flac = flac.clone();
+            let pb = pb.clone();
+            tasks.push(tokio::spawn(async move {
+                let mut join_set = JoinSet::new();
 
-            spectrogram::spectrogram::make_spectrogram_full(
-                &flac_path,
-                &flac,
-                &spectrogram_directory,
-            )
-            .await?;
+                let semaphore_clone = Arc::clone(&semaphore);
+                let spectrogram_directory_clone = spectrogram_directory.clone();
+                let flac_path_clone = flac_path.clone();
+                let flac_clone = flac.clone();
 
-            pb.inc(1);
+                join_set.spawn(async move {
+                    let _permit = semaphore_clone.acquire().await.unwrap();
+
+                    spectrogram::spectrogram::make_spectrogram_zoom(
+                        &flac_path_clone,
+                        &flac_clone,
+                        &spectrogram_directory_clone,
+                    )
+                    .await?;
+
+                    Ok::<(), anyhow::Error>(())
+                });
+
+                let semaphore = Arc::clone(&semaphore);
+                let spectrogram_directory = spectrogram_directory.clone();
+                let flac_path = flac_path.clone();
+                let flac = flac.clone();
+
+                join_set.spawn(async move {
+                    let _permit = semaphore.acquire().await.unwrap();
+
+                    spectrogram::spectrogram::make_spectrogram_full(
+                        &flac_path,
+                        &flac,
+                        &spectrogram_directory,
+                    )
+                    .await?;
+
+                    Ok::<(), anyhow::Error>(())
+                });
+
+                while let Some(result) = join_set.join_next().await {
+                    result??;
+                }
+
+                pb.inc(1);
+
+                Ok::<(), anyhow::Error>(())
+            }));
+        }
+
+        for task in tasks {
+            task.await??;
         }
 
         let mut prompt = Confirm::new();
