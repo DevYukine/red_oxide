@@ -29,8 +29,8 @@ Options:
           If debug logs should be shown
   -a, --automatic-upload
           If the upload should be done automatically
-      --transcode-in-parallel
-          If multiple formats should be transcoded in parallel (this will increase memory & cpu usage a lot, make sure you can handle it)
+      --concurrency <CONCURRENCY>
+          How many tasks (for transcoding as example) should be run in parallel, defaults to your CPU count
       --api-key <API_KEY>
           The Api key from Redacted to use there API with
       --content-directory <CONTENT_DIRECTORY>
@@ -55,11 +55,12 @@ Options:
           If this is a dry run, no files will be uploaded to Redacted
   -h, --help
           Print help
+
 ```
 
 ### Example config.json
 
-This is useful if you don't want a super long CLI command and your configs do not change often
+This is useful if you don't want a super long CLI command and your configs do not change often, note that all the options can be specified via the CLI as well and are fully optional in this config file (will be merged with the CLI options if specified)
 
 ```json
 {
@@ -69,7 +70,11 @@ This is useful if you don't want a super long CLI command and your configs do no
   "transcode_directory": "FULL_PATH_WHERE_TRANSCODED_CONTENT_WILL_BE_PUT",
   "spectrogram_directory": "FULL_PATH_WHERE_SPECTROGRAMS_WILL_BE_PUT",
   "move_transcode_to_content": true,
-  "automatic_upload": true
+  "automatic_upload": true,
+  "skip_hash_check": false,
+  "skip_spectrogram": false,
+  "allowed_transcode_formats": ["Flac", "Mp3320", "Mp3V0"],
+  "concurrency": 16
 }
 
 ```
