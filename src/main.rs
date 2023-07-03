@@ -16,6 +16,7 @@ use strum::IntoEnumIterator;
 use tags::util::valid_tags;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
+use ReleaseType::{Flac24, Mp3320, Mp3V0};
 
 use crate::config::config::apply_config;
 use transcode::transcode::transcode_release;
@@ -24,6 +25,7 @@ use crate::fs::util::get_all_files_with_extension;
 use crate::redacted::api::client::RedactedApi;
 use crate::redacted::api::constants::TRACKER_URL;
 use crate::redacted::api::path::is_path_exceeding_redacted_path_limit;
+use crate::redacted::models::ReleaseType::Flac;
 use crate::redacted::models::{Category, Media, ReleaseType};
 use crate::redacted::upload::TorrentUploadData;
 use crate::redacted::util::perma_link;
@@ -226,10 +228,10 @@ async fn handle_url(
             match t.format.as_str() {
                 "FLAC" => match t.encoding.as_str() {
                     "Lossless" => {
-                        existing_formats.insert(ReleaseType::Flac);
+                        existing_formats.insert(Flac);
                     }
                     "24bit Lossless" => {
-                        existing_formats.insert(ReleaseType::Flac24);
+                        existing_formats.insert(Flac24);
                     },
                     _ => {
                         term.write_line(&format!(
@@ -241,10 +243,10 @@ async fn handle_url(
                 "MP3" => {
                     match t.encoding.as_str() {
                         "320" => {
-                            existing_formats.insert(ReleaseType::Mp3320);
+                            existing_formats.insert(Mp3320);
                         }
                         "V0 (VBR)" => {
-                            existing_formats.insert(ReleaseType::Mp3V0);
+                            existing_formats.insert(Mp3V0);
                         }
                         _ => {
                             term.write_line(&format!(
@@ -263,9 +265,7 @@ async fn handle_url(
             }
         });
 
-    if !existing_formats.contains(&ReleaseType::Flac)
-        && !existing_formats.contains(&ReleaseType::Flac24)
-    {
+    if !existing_formats.contains(&Flac) && !existing_formats.contains(&Flac24) {
         term.write_line(&format!(
             "{} Torrent {} in group {} has no FLAC base to transcode from... skipping",
             WARNING, torrent_id, group_id
@@ -518,10 +518,10 @@ async fn handle_url(
         pb_format.set_style(sty.clone());
 
         let transcode_format_str = match format {
-            ReleaseType::Flac24 => "FLAC 24bit",
-            ReleaseType::Flac => "FLAC",
-            ReleaseType::Mp3320 => "MP3 - 320",
-            ReleaseType::Mp3V0 => "MP3 - V0",
+            Flac24 => "FLAC 24bit",
+            Flac => "FLAC",
+            Mp3320 => "MP3 - 320",
+            Mp3V0 => "MP3 - V0",
         };
 
         let transcode_release_name = format!(
@@ -627,17 +627,17 @@ async fn handle_url(
         let description = create_description(perma_link.clone(), command.clone());
 
         let format_red = match format {
-            ReleaseType::Flac24 => "FLAC",
-            ReleaseType::Flac => "FLAC",
-            ReleaseType::Mp3320 => "MP3",
-            ReleaseType::Mp3V0 => "MP3",
+            Flac24 => "FLAC",
+            Flac => "FLAC",
+            Mp3320 => "MP3",
+            Mp3V0 => "MP3",
         };
 
         let bitrate = match format {
-            ReleaseType::Flac24 => "24bit Lossless".to_string(),
-            ReleaseType::Flac => "Lossless".to_string(),
-            ReleaseType::Mp3320 => "320".to_string(),
-            ReleaseType::Mp3V0 => "V0 (VBR)".to_string(),
+            Flac24 => "24bit Lossless".to_string(),
+            Flac => "Lossless".to_string(),
+            Mp3320 => "320".to_string(),
+            Mp3V0 => "V0 (VBR)".to_string(),
         };
 
         if cmd.move_transcode_to_content {
@@ -657,10 +657,10 @@ async fn handle_url(
 
             let scene = if torrent.scene { "Yes" } else { "No" };
             let format = match format {
-                ReleaseType::Flac24 => "FLAC",
-                ReleaseType::Flac => "FLAC",
-                ReleaseType::Mp3320 => "MP3",
-                ReleaseType::Mp3V0 => "MP3",
+                Flac24 => "FLAC",
+                Flac => "FLAC",
+                Mp3320 => "MP3",
+                Mp3V0 => "MP3",
             };
 
             term.write_line(&*("Link: ".to_owned() + &*perma_link))?;
