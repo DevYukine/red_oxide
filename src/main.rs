@@ -100,6 +100,10 @@ pub struct TranscodeCommand {
     #[arg(long, short = 'f')]
     pub allowed_transcode_formats: Vec<ReleaseType>,
 
+    /// If the existing formats check should be bypassed, useful when you want to transcode a torrent again or trump an already existing one, be aware that this will still take allowed_transcode_formats into account
+    #[arg(long, default_value = "false")]
+    pub skip_existing_formats_check: bool,
+
     /// If the transcode should be moved to the content directory, useful when you want to start seeding right after you upload
     #[arg(long, short, default_value = "false")]
     pub move_transcode_to_content: bool,
@@ -276,11 +280,23 @@ async fn handle_url(
     let mut transcode_formats = Vec::new();
 
     ReleaseType::iter().for_each(|release_type| {
-        if !existing_formats.contains(&release_type)
-            && release_type != ReleaseType::Flac24
-            && cmd.allowed_transcode_formats.contains(&release_type)
-        {
-            transcode_formats.push(release_type);
+        let format_already_exist = existing_formats.contains(&release_type);
+        let release_is_not_flac_24 = release_type != Flac24;
+        let release_is_allowed_to_transcode = cmd.allowed_transcode_formats.contains(&release_type);
+
+        let release_is_not_flac_24_and_allowed_to_transcode =
+            release_is_not_flac_24 && release_is_allowed_to_transcode;
+
+        if cmd.skip_existing_formats_check {
+            if release_is_not_flac_24_and_allowed_to_transcode
+                && (release_type != Flac || torrent.format != "FLAC")
+            {
+                transcode_formats.push(release_type);
+            }
+        } else {
+            if !format_already_exist && release_is_not_flac_24_and_allowed_to_transcode {
+                transcode_formats.push(release_type);
+            }
         }
     });
 
