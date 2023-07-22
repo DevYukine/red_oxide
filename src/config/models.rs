@@ -12,6 +12,7 @@ pub struct RedOxideConfig {
     pub spectrogram_directory: Option<PathBuf>,
     pub move_transcode_to_content: Option<bool>,
     pub automatic_upload: Option<bool>,
+    pub spectrogram_only: Option<bool>,
     pub skip_hash_check: Option<bool>,
     pub skip_spectrogram: Option<bool>,
     pub allowed_transcode_formats: Option<Vec<ReleaseType>>,
