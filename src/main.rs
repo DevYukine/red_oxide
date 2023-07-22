@@ -334,7 +334,7 @@ async fn handle_url(
 
     let group_name = group.name.replace(":", "");
 
-    let base_name = if torrent.remaster_title.len() > 1 {
+    let raw_base_name = if torrent.remaster_title.len() > 1 {
         format!(
             "{} - {} ({}) [{}]",
             artist, group_name, torrent.remaster_title, year
@@ -342,6 +342,7 @@ async fn handle_url(
     } else {
         format!("{} - {} [{}]", artist, group_name, year)
     };
+    let base_name = raw_base_name.replace(&['<', '>', ':', '"', '/', '\\', '|', '?', '*', '/'][..], "_");
 
     let content_directory = cmd.content_directory.unwrap();
 
