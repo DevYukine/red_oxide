@@ -108,7 +108,7 @@ pub struct TranscodeCommand {
     #[arg(long, short, default_value = "false")]
     pub move_transcode_to_content: bool,
 
-    /// If the only the spectrograms should be created, without transcoding or uploading. Defaults to false.
+    /// If only the spectrograms should be created, without transcoding or uploading. Defaults to false.
     #[arg(long, default_value = "false")]
     pub spectrogram_only: bool,
 
