@@ -158,14 +158,26 @@ async fn transcode(mut cmd: TranscodeCommand) -> anyhow::Result<()> {
     ))?;
 
     for url in cmd.urls.clone() {
-        handle_url(
+        let result = handle_url(
             url.as_str(),
             &term,
             &mut api,
             cmd.clone(),
             index_response.passkey.clone(),
         )
-        .await?;
+        .await;
+
+        match result {
+            Ok(success) => {
+                // no-op
+            },
+            Err(error) => {
+                term.write_line(&format!(
+                    "{} Skipping due to encountered error: {}",
+                    ERROR, error
+                ))?;
+            },
+        }
     }
 
     Ok(())
