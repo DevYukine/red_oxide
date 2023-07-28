@@ -24,6 +24,7 @@ use transcode::transcode::transcode_release;
 use crate::fs::util::get_all_files_with_extension;
 use crate::redacted::api::client::RedactedApi;
 use crate::redacted::api::constants::TRACKER_URL;
+use crate::redacted::api::constants::FORBIDDEN_CHARACTERS;
 use crate::redacted::api::path::is_path_exceeding_redacted_path_limit;
 use crate::redacted::models::ReleaseType::Flac;
 use crate::redacted::models::{Category, Media, ReleaseType};
@@ -349,7 +350,7 @@ async fn handle_url(
     } else {
         format!("{} - {} [{}]", artist, group_name, year)
     };
-    let base_name = raw_base_name.replace(&['<', '>', ':', '"', '/', '\\', '|', '?', '*', '/'][..], "_");
+    let base_name = raw_base_name.replace(&FORBIDDEN_CHARACTERS[..], "_");
 
     let content_directory = cmd.content_directory.unwrap();
 
