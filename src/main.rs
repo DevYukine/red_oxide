@@ -163,16 +163,11 @@ async fn transcode(mut cmd: TranscodeCommand) -> anyhow::Result<()> {
         )
         .await;
 
-        match result {
-            Ok(success) => {
-                // no-op
-            },
-            Err(error) => {
-                term.write_line(&format!(
-                    "{} Skipping due to encountered error: {}",
-                    ERROR, error
-                ))?;
-            },
+        if let Err(e) = result {
+            term.write_line(&format!(
+                "{} Skipping due to encountered error: {}",
+                ERROR, e
+            ))?;
         }
     }
 
