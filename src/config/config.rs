@@ -40,10 +40,6 @@ pub async fn apply_config(cmd: &mut TranscodeCommand, term: &Term) -> anyhow::Re
             cmd.automatic_upload = *automatic_upload;
         }
 
-        if let Some(spectrogram_only) = &config.spectrogram_only {
-            cmd.spectrogram_only = *spectrogram_only;
-        }
-
         if let Some(skip_hash_check) = &config.skip_hash_check {
             cmd.skip_hash_check = *skip_hash_check;
         }

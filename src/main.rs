@@ -108,10 +108,6 @@ pub struct TranscodeCommand {
     #[arg(long, short, default_value = "false")]
     pub move_transcode_to_content: bool,
 
-    /// If only the spectrograms should be created, without transcoding or uploading. Defaults to false.
-    #[arg(long, default_value = "false")]
-    pub spectrogram_only: bool,
-
     /// If the hash check of the original torrent should be skipped, defaults to false, not recommended and if enabled done at own risk!
     #[arg(long, default_value = "false")]
     pub skip_hash_check: bool,
@@ -494,15 +490,11 @@ async fn handle_url(
             task.await??;
         }
 
+        let mut prompt = Confirm::new();
+
         pb.finish_and_clear();
 
         term.write_line(&*format!("{} Created Spectrograms at {}, please manual check if FLAC is lossless before continuing!", PAUSE, to_create.to_str().unwrap()))?;
-
-        if cmd.spectrogram_only {
-            return Ok(());
-        }
-
-        let mut prompt = Confirm::new();
 
         prompt
             .with_prompt("Do those spectrograms look good?")
