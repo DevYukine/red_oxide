@@ -32,7 +32,7 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
       - name: Install Build-Tools
-        run: sudo apt-get update && sudo apt-get install install build-essential gcc-multilib
+        run: sudo apt-get update && sudo apt-get install build-essential gcc-multilib
       - name: Build target
         uses: actions-rs/cargo@v1
         with:
