@@ -24,6 +24,7 @@ use transcode::transcode::transcode_release;
 use crate::fs::util::get_all_files_with_extension;
 use crate::redacted::api::client::RedactedApi;
 use crate::redacted::api::constants::TRACKER_URL;
+use crate::redacted::api::constants::FORBIDDEN_CHARACTERS;
 use crate::redacted::api::path::is_path_exceeding_redacted_path_limit;
 use crate::redacted::models::ReleaseType::Flac;
 use crate::redacted::models::{Category, Media, ReleaseType};
@@ -154,14 +155,21 @@ async fn transcode(mut cmd: TranscodeCommand) -> anyhow::Result<()> {
     ))?;
 
     for url in cmd.urls.clone() {
-        handle_url(
+        let result = handle_url(
             url.as_str(),
             &term,
             &mut api,
             cmd.clone(),
             index_response.passkey.clone(),
         )
-        .await?;
+        .await;
+
+        if let Err(e) = result {
+            term.write_line(&format!(
+                "{} Skipping due to encountered error: {}",
+                ERROR, e
+            ))?;
+        }
     }
 
     Ok(())
@@ -334,7 +342,7 @@ async fn handle_url(
 
     let group_name = group.name.replace(":", "");
 
-    let base_name = if torrent.remaster_title.len() > 1 {
+    let raw_base_name = if torrent.remaster_title.len() > 1 {
         format!(
             "{} - {} ({}) [{}]",
             artist, group_name, torrent.remaster_title, year
@@ -342,6 +350,7 @@ async fn handle_url(
     } else {
         format!("{} - {} [{}]", artist, group_name, year)
     };
+    let base_name = raw_base_name.replace(&FORBIDDEN_CHARACTERS[..], "_");
 
     let content_directory = cmd.content_directory.unwrap();
 
