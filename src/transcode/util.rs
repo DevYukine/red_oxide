@@ -20,7 +20,7 @@ pub async fn copy_other_allowed_files(
         } else {
             let extension = path.extension().unwrap().to_str().unwrap().to_lowercase();
 
-            let allowed_extension = vec!["gif", "jpeg", "jpg", "nfo", "pdf", "png", "sfv", "txt"];
+            let allowed_extension = vec!["gif", "jpeg", "jpg", "pdf", "png", "txt"];
 
             if allowed_extension.contains(&extension.as_str()) {
                 let relativ_path = path.strip_prefix(original_dir_path)?;
