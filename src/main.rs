@@ -236,6 +236,13 @@ async fn handle_url(
         return Ok(());
     }
 
+    if torrent.lossy_web_approved || torrent.lossy_master_approved {
+        term.write_line(&format!(
+            "{} Torrent {} in group {} is a lossy web/master release, once you upload a transcode you should report it and get staff approval",
+            WARNING, torrent_id, group_id
+        ))?;
+    }
+
     let mut existing_formats = HashSet::new();
 
     group_torrents
