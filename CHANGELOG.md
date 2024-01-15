@@ -1,3 +1,12 @@
+## [0.7.1](https://github.com/DevYukine/red_oxide/compare/v0.7.0...v0.7.1) (2024-01-15)
+
+
+### Bug Fixes
+
+* **ci:** reference the created tag for release builds ([f9e1d91](https://github.com/DevYukine/red_oxide/commit/f9e1d91a461cdd367999cc75bb4e34b7d26686ad))
+
+
+
 # [0.7.0](https://github.com/DevYukine/red_oxide/compare/v0.6.0...v0.7.0) (2024-01-15)
 
 
@@ -63,15 +72,6 @@
 ### Features
 
 * **spectrogram:** add progress bar for spectrogram creation ([386682d](https://github.com/DevYukine/red_oxide/commit/386682d17ebd192aa7d4905fdd9720834a89c62e))
-
-
-
-# [0.3.0](https://github.com/DevYukine/red_oxide/compare/v0.2.0...v0.3.0) (2023-04-19)
-
-
-### Features
-
-* **config:** add missing options and flags to configmake & optional ([e23dba0](https://github.com/DevYukine/red_oxide/commit/e23dba042d8b2d0cbe4ab6f318897bd38db19009))
 
 
 
