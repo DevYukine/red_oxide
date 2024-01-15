@@ -11,6 +11,7 @@ env:
 jobs:
   changelog:
     outputs:
+      tag: ${{ steps.changelog.outputs.tag }}
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     name: Create Changelog
     runs-on: ubuntu-latest
