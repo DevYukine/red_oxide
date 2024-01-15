@@ -81,7 +81,7 @@ This is useful if you don't want a super long CLI command and your configs do no
 
 ### Notes for people using sox under windows
 
-if you use the binaries from [here](https://sourceforge.net/projects/sox/files/sox/), and you want utf-8 support for paths (this is needed for Japanese/Chinese/Korean names in paths for example) you have to download the files from [here](https://anonfiles.com/g7i1G1m8z5/sox_windows_fix_zip) and follow the steps below
+if you use the binaries from [here](https://sourceforge.net/projects/sox/files/sox/), and you want utf-8 support for paths (this is needed for Japanese/Chinese/Korean names in paths for example) you have to download the files from [here](https://raw.githubusercontent.com/DevYukine/red_oxide/master/.github/dependency-fixes/sox_windows_fix.zip) and follow the steps below
 
 1. Extract the files from the zip
 2. Run the PreferExternalManifest.reg file and let it overwrite the registry entry
