@@ -43,7 +43,7 @@ jobs:
       - name: Checkout Source code
         uses: actions/checkout@v4
         with:
-          tag: ${{ needs.changelog.outputs.tag }}
+          ref: ${{ needs.changelog.outputs.tag }}
       - name: Cache Rust dependencies
         uses: actions/cache@v3
         with:
@@ -86,7 +86,7 @@ jobs:
       - name: Checkout Source code
         uses: actions/checkout@v4
         with:
-          tag: ${{ needs.changelog.outputs.tag }}
+          ref: ${{ needs.changelog.outputs.tag }}
       - name: Cache Rust dependencies
         uses: actions/cache@v3
         with:
@@ -126,7 +126,7 @@ jobs:
       - name: Checkout Source code
         uses: actions/checkout@v4
         with:
-          tag: ${{ needs.changelog.outputs.tag }}
+          ref: ${{ needs.changelog.outputs.tag }}
       - name: Cache Rust dependencies
         uses: actions/cache@v3
         with:
