@@ -1,3 +1,19 @@
+# [0.8.0](https://github.com/DevYukine/red_oxide/compare/v0.7.2...v0.8.0) (2024-01-16)
+
+
+### Bug Fixes
+
+* **config:** use correct HOME_ENV constant ([ee3584a](https://github.com/DevYukine/red_oxide/commit/ee3584aeaa6b520959c4d466fc5d3bb5f3c0f5e5))
+* **transcode:** do not drop reference while borrowed ([00c3ffd](https://github.com/DevYukine/red_oxide/commit/00c3ffda9fbbc7fbf0551b70dbf045b3e593db1a))
+* **transcode:** fallback if no extension exists ([346e3d3](https://github.com/DevYukine/red_oxide/commit/346e3d3d0c09d66feda1178012a8153f4bb226ab))
+
+
+### Features
+
+* add default paths for config file ([c823b08](https://github.com/DevYukine/red_oxide/commit/c823b08239a4aa7c4dbf212c021518f51a0224f0))
+
+
+
 ## [0.7.2](https://github.com/DevYukine/red_oxide/compare/v0.7.1...v0.7.2) (2024-01-15)
 
 
@@ -51,21 +67,6 @@
 
 * add way to set allowed transcode targets in cli & via the config ([90d2b02](https://github.com/DevYukine/red_oxide/commit/90d2b0261345ab3fcb8d7c439419272f3d86a7c3))
 * **redacted:** add version to upload description ([3b56f9d](https://github.com/DevYukine/red_oxide/commit/3b56f9d0e4dd48346bacf4bc80b201bf78715711))
-
-
-
-# [0.5.0](https://github.com/DevYukine/red_oxide/compare/v0.4.0...v0.5.0) (2023-04-21)
-
-
-### Bug Fixes
-
-* **redacted:** correct Blu-ray -> Blu-Ray for api response ([aa72cb1](https://github.com/DevYukine/red_oxide/commit/aa72cb12604ee01a128c69f26f7056108791062e))
-
-
-### Features
-
-* **threads:** remove useless threads argument ([9cc7be8](https://github.com/DevYukine/red_oxide/commit/9cc7be8c937493f92092cfa26e28b872242388b8))
-* **transcode:** add total progress bar, fix ghost bar showing up ([ba947c0](https://github.com/DevYukine/red_oxide/commit/ba947c0614e5cd161b3f70174e0c43ccea142074))
 
 
 
