@@ -23,9 +23,9 @@ pub async fn copy_other_allowed_files(
             let allowed_extension = vec!["gif", "jpeg", "jpg", "pdf", "png", "txt"];
 
             if allowed_extension.contains(&extension.as_str()) {
-                let relativ_path = path.strip_prefix(original_dir_path)?;
+                let relative_path = path.strip_prefix(original_dir_path)?;
 
-                let transcode_dir_path = transcode_dir_path.join(relativ_path);
+                let transcode_dir_path = transcode_dir_path.join(relative_path);
 
                 fs::create_dir_all(transcode_dir_path.parent().unwrap()).await?;
 
