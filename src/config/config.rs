@@ -98,7 +98,7 @@ fn get_home_env() -> Option<String> {
 
 #[cfg(not(target_os = "windows"))]
 fn get_home_env() -> Option<String> {
-    if let Ok(home) = env::var(UNIX_HOME_ENV) {
+    if let Ok(home) = env::var(HOME_ENV) {
         return Some(home);
     }
 
