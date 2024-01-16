@@ -507,7 +507,7 @@ async fn handle_url(
 
         term.write_line(&*format!("{} Created Spectrograms at {}, please manual check if FLAC is lossless before continuing!", PAUSE, to_create.to_str().unwrap()))?;
 
-        prompt
+        prompt = prompt
             .with_prompt("Do those spectrograms look good?")
             .default(true);
 
@@ -619,7 +619,7 @@ async fn handle_url(
     if invalid_track_number_vinyl {
         let mut prompt = Confirm::new();
 
-        prompt
+        prompt = prompt
             .with_prompt(format!("{} Please check tags of trancoded media and adjust as needed (release is vinyl and has either no track number or in an non standard format e.g. A1, A2 etc which the audiotags library used can't parse), continue?", WARNING))
             .default(true);
 
@@ -633,7 +633,7 @@ async fn handle_url(
         let mut exceeds_red_path_length = is_path_exceeding_redacted_path_limit(&path).await?;
 
         while exceeds_red_path_length {
-            let mut editor = Input::new();
+            let editor = Input::new();
 
             let edited_text = editor
                 .with_prompt(format!(
@@ -730,7 +730,7 @@ async fn handle_url(
 
             let mut prompt = Confirm::new();
 
-            prompt
+            prompt = prompt
                 .with_prompt("Confirm once you are done uploading...")
                 .default(true);
 
