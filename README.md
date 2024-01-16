@@ -58,9 +58,26 @@ Options:
 
 ```
 
-### Example config.json
+### Config file
 
 This is useful if you don't want a super long CLI command and your configs do not change often, note that all the options can be specified via the CLI as well and are fully optional in this config file (will be merged with the CLI options if specified)
+
+There are multiple default locations where the config file will be searched for, in this order (once found it will not look for the config file in the other locations):
+1. The path specified via the --config-file CLI option
+2. In the same folder as the red_oxide executable
+3. `%APPDATA%/red_oxide/red_oxide.config.json` (only on Windows)
+4. `$XDG_CONFIG_HOME/red_oxide/red_oxide.config.json`
+5. `HOME/.config/red_oxide/red_oxide.config.json`
+6. `HOME/red_oxide.config.json`
+
+HOME is determined by these environment variables on Windows in this order:
+1. `%HOME%`
+2. `%USERPROFILE%`
+3. `%HOMEDRIVE%\%HOMEPATH%`
+
+HOME is determined by these environment variables on Linux in this order:
+1. `$HOME`
+
 
 ```json
 {
