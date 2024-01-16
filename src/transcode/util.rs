@@ -18,11 +18,14 @@ pub async fn copy_other_allowed_files(
         if path.is_dir() {
             copy_other_allowed_files(&path, original_dir_path, transcode_dir_path).await?;
         } else {
-            let extension = path.extension().unwrap().to_str().unwrap().to_lowercase();
+            let extension = match path.extension() {
+                None => "", // fallback if no extension exists
+                Some(extension_os) => extension_os.to_str().unwrap().to_lowercase().as_str(),
+            };
 
             let allowed_extension = vec!["gif", "jpeg", "jpg", "pdf", "png", "txt"];
 
-            if allowed_extension.contains(&extension.as_str()) {
+            if allowed_extension.contains(&extension) {
                 let relative_path = path.strip_prefix(original_dir_path)?;
 
                 let transcode_dir_path = transcode_dir_path.join(relative_path);
