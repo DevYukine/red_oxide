@@ -64,7 +64,7 @@ This is useful if you don't want a super long CLI command and your configs do no
 
 There are multiple default locations where the config file will be searched for, in this order (once found it will not look for the config file in the other locations):
 1. The path specified via the --config-file CLI option
-2. In the same folder as the red_oxide executable
+2. `./red_oxide.config.json` (In the same folder as the red_oxide executable)
 3. `%APPDATA%/red_oxide/red_oxide.config.json` (only on Windows)
 4. `$XDG_CONFIG_HOME/red_oxide/red_oxide.config.json`
 5. `HOME/.config/red_oxide/red_oxide.config.json`
