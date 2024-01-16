@@ -94,9 +94,8 @@ dependencies = [
 
 [[package]]
 name = "audiotags"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f47bdf1acc4fa4113f8aa72bb3bfe62a61443c61d0d997b723ba61ce102c79b"
+version = "0.5.0"
+source = "git+https://github.com/TianyiShi2001/audiotags.git?branch=main#e4ee5c95abec8ef6588858e5e2a069461b4fafc8"
 dependencies = [
  "audiotags-dev-macro",
  "id3",
@@ -108,9 +107,8 @@ dependencies = [
 
 [[package]]
 name = "audiotags-dev-macro"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b79298591161f312f06327df7963063ee07466be303dcc3084a44ec293cb36e"
+version = "0.2.0"
+source = "git+https://github.com/TianyiShi2001/audiotags.git?branch=main#e4ee5c95abec8ef6588858e5e2a069461b4fafc8"
 
 [[package]]
 name = "autocfg"
