@@ -31,8 +31,8 @@ derivative = "^2.2"
 claxon = "^0.4"
 async-recursion = "^1.0"
 lazy_static = "^1.4"
-dialoguer = "^0.10"
+dialoguer = "^0.11"
 html-escape = "^0.2"
 
 [build-dependencies]
-built = "^0.6"
+built = "^0.7"
