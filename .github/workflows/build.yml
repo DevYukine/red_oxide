@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - master
+    paths:
+      - src/**
+      - Cargo.toml
+      - Cargo.lock
+      - .github/workflows/build.yml
 
 env:
   CARGO_TERM_COLOR: always
