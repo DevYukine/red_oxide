@@ -42,14 +42,14 @@ jobs:
 
           - release_for: Linux-i686
             os: ubuntu-20.04
-            target: i686-unknown-linux
+            target: i686-unknown-linux-gnu
             bin: red_oxide
             name: red_oxide-Linux-i686
             command: build
 
           - release_for: Linux-aarch64
             os: ubuntu-20.04
-            target: aarch64-unknown-linux
+            target: aarch64-unknown-linux-gnu
             bin: red_oxide
             name: red_oxide-Linux-aarch64
             command: build
