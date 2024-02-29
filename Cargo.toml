@@ -21,12 +21,12 @@ thiserror = "^1"
 tokio = { version = "^1", features = ["full"] }
 regex = "^1"
 audiotags = { git = "https://github.com/TianyiShi2001/audiotags.git", branch = "main" }
-env_logger = "^0.10"
+env_logger = "^0.11"
 log = "^0.4"
 num_cpus = "^1.15"
 tower = { version = "^0.4", features = ["util", "limit"] }
-strum = "^0.25"
-strum_macros = "^0.25"
+strum = "^0.26"
+strum_macros = "^0.26"
 derivative = "^2.2"
 claxon = "^0.4"
 async-recursion = "^1.0"
