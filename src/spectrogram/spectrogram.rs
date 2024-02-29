@@ -94,6 +94,6 @@ pub async fn make_spectrogram_full(
     if output.status.success() {
         Ok(())
     } else {
-        Err(anyhow::anyhow!("Failed to create torrent"))
+        Err(anyhow::anyhow!("Failed to create spectrogram"))
     }
 }
