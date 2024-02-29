@@ -14,104 +14,99 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  linux:
-    name: Linux Build
-    runs-on: ubuntu-latest
+  release:
+    name: Build Commit - ${{ matrix.platform.release_for }}
     strategy:
       matrix:
-        target: [ x86_64-unknown-linux-musl, x86_64-unknown-linux-gnu, i686-unknown-linux-gnu, aarch64-unknown-linux-gnu, armv7-unknown-linux-gnueabihf ]
-    steps:
-      - name: Checkout Source code
-        uses: actions/checkout@v4
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          target: ${{ matrix.target }}
-      - name: Install Build-Tools
-        run: sudo apt-get update && sudo apt-get install build-essential gcc-multilib
-      - name: Build target
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --release --target ${{ matrix.target }}
-      - name: Upload Action Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: red_oxide_${{ runner.OS }}_${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/red_oxide
+        platform:
+          - release_for: FreeBSD-x86_64
+            os: ubuntu-20.04
+            target: x86_64-unknown-freebsd
+            bin: red_oxide
+            name: red_oxide-FreeBSD-x86_64
+            command: build
 
-  windows:
-    name: Windows Build
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        target: [ i686-pc-windows-msvc, x86_64-pc-windows-msvc ]
-    steps:
-      - name: Checkout Source code
-        uses: actions/checkout@v4
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          target: ${{ matrix.target }}
-      - name: Build target
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --target ${{ matrix.target }}
-      - name: Upload Action Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: red_oxide_${{ runner.OS }}_${{ matrix.target }}.exe
-          path: target/${{ matrix.target }}/release/red_oxide.exe
+          - release_for: Linux-x86_64-gnu
+            os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            bin: red_oxide
+            name: red_oxide-Linux-x86_64-gnu
+            command: build
 
-  macos:
-    name: MacOS Build
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        target: [ x86_64-apple-darwin, aarch64-apple-darwin ]
+          - release_for: Linux-x86_64-musl
+            os: ubuntu-20.04
+            target: x86_64-unknown-linux-musl
+            bin: red_oxide
+            name: red_oxide-Linux-x86_64-musl
+            command: build
+
+          - release_for: Linux-i686
+            os: ubuntu-20.04
+            target: i686-unknown-linux
+            bin: red_oxide
+            name: red_oxide-Linux-i686
+            command: build
+
+          - release_for: Linux-aarch64
+            os: ubuntu-20.04
+            target: aarch64-unknown-linux
+            bin: red_oxide
+            name: red_oxide-Linux-aarch64
+            command: build
+
+          - release_for: Linux-armv7
+            os: ubuntu-20.04
+            target: armv7-unknown-linux-gnueabihf
+            bin: red_oxide
+            name: red_oxide-Linux-armv7
+            command: build
+
+          - release_for: Windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: red_oxide.exe
+            name: red_oxide-Windows-x86_64.exe
+            command: build
+
+          - release_for: Windows-i686
+            os: windows-latest
+            target: i686-pc-windows-msvc
+            bin: red_oxide.exe
+            name: red_oxide-Windows-i686.exe
+            command: build
+
+          - release_for: macOS-x86_64
+            os: macOS-latest
+            target: x86_64-apple-darwin
+            bin: red_oxide
+            name: red_oxide-Darwin-x86_64
+            command: build
+
+          - release_for: macOS-aarch64
+            os: macOS-latest
+            target: aarch64-apple-darwin
+            bin: red_oxide
+            name: red_oxide-Darwin-aarch64
+            command: build
+
+    runs-on: ${{ matrix.platform.os }}
     steps:
       - name: Checkout Source code
-        uses: actions/checkout@v4
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
+        uses: actions/checkout@v3
+      - name: Cache cargo & target directories
+        uses: Swatinem/rust-cache@v2
+      - name: Install musl-tools on Linux
+        run: sudo apt-get update --yes && sudo apt-get install --yes musl-tools
+        if: contains(matrix.platform.name, 'musl')
+      - name: Build binary
+        uses: houseabsolute/actions-rust-cross@v0
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          target: ${{ matrix.target }}
-      - name: Build target
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --target ${{ matrix.target }}
+          command: ${{ matrix.platform.command }}
+          target: ${{ matrix.platform.target }}
+          args: "--locked --release"
+          strip: true
       - name: Upload Action Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: red_oxide_${{ runner.OS }}_${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/red_oxide
+          name: ${{ matrix.platform.name }}
+          path: target/${{ matrix.platform.target }}/release/${{ matrix.platform.bin }}
