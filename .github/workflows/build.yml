@@ -14,7 +14,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  release:
+  build:
     name: Build Commit - ${{ matrix.platform.release_for }}
     strategy:
       matrix:
