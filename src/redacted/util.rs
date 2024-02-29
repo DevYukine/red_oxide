@@ -2,8 +2,8 @@ use crate::built_info;
 
 pub fn create_description(original_torrent_perma_url: String, transcode_command: String) -> String {
     return format!(
-        "Transcode of [url={}]{}[/url]\n\nTranscode process:\n[code]{}[/code]\nCreated using [url=https://github.com/DevYukine/red_oxide]red_oxide v{} by DevYukine[/url]",
-        original_torrent_perma_url, original_torrent_perma_url, transcode_command, built_info::PKG_VERSION
+        "Transcode of [url]{}[/url]\n\nTranscode process:\n[code]{}[/code]\nCreated using [url=https://github.com/DevYukine/red_oxide]red_oxide v{} by DevYukine[/url]",
+        original_torrent_perma_url, transcode_command, built_info::PKG_VERSION
     );
 }
 
