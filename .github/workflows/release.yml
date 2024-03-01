@@ -35,7 +35,7 @@ jobs:
           body: ${{ steps.changelog.outputs.clean_changelog }}
 
   release-build:
-    name: Build Commit - ${{ matrix.platform.release_for }}
+    name: Build Release - ${{ matrix.platform.release_for }}
     needs: changelog
     strategy:
       matrix:
