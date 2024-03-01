@@ -1,3 +1,13 @@
+## [0.8.1](https://github.com/DevYukine/red_oxide/compare/v0.8.0...v0.8.1) (2024-03-01)
+
+
+### Bug Fixes
+
+* **redacted:** minimalize url bbcode to improve integration with other tools ([6a0ac4b](https://github.com/DevYukine/red_oxide/commit/6a0ac4bfc0b3d58e19f671dc2075444491b50c44))
+* **spectrogram:** use correct error message for failing to create spectrogram ([132aac3](https://github.com/DevYukine/red_oxide/commit/132aac347d2e6c670d822fd3c0ab97a4e40441f8))
+
+
+
 # [0.8.0](https://github.com/DevYukine/red_oxide/compare/v0.7.2...v0.8.0) (2024-01-16)
 
 
@@ -52,21 +62,6 @@
 ### Performance Improvements
 
 * **spectrograms:** add support for concurrency option ([1ecf337](https://github.com/DevYukine/red_oxide/commit/1ecf3377fa4fda9808e103adb5daa34361917e48))
-
-
-
-# [0.6.0](https://github.com/DevYukine/red_oxide/compare/v0.5.0...v0.6.0) (2023-04-23)
-
-
-### Bug Fixes
-
-* **redacted:** check if files exceed redacteds allowed path limit ([020afab](https://github.com/DevYukine/red_oxide/commit/020afabfda15655c00f6dee6b869fc1b0f65c593))
-
-
-### Features
-
-* add way to set allowed transcode targets in cli & via the config ([90d2b02](https://github.com/DevYukine/red_oxide/commit/90d2b0261345ab3fcb8d7c439419272f3d86a7c3))
-* **redacted:** add version to upload description ([3b56f9d](https://github.com/DevYukine/red_oxide/commit/3b56f9d0e4dd48346bacf4bc80b201bf78715711))
 
 
 
