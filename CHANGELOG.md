@@ -1,3 +1,12 @@
+## [0.8.2](https://github.com/DevYukine/red_oxide/compare/v0.8.1...v0.8.2) (2024-03-01)
+
+
+### Bug Fixes
+
+* **ci:** do not pass locked flag for release action ([ce6b410](https://github.com/DevYukine/red_oxide/commit/ce6b4104df6c4665f164836f8e9b85c253dea2e3))
+
+
+
 ## [0.8.1](https://github.com/DevYukine/red_oxide/compare/v0.8.0...v0.8.1) (2024-03-01)
 
 
@@ -39,29 +48,6 @@
 ### Bug Fixes
 
 * **ci:** reference the created tag for release builds ([f9e1d91](https://github.com/DevYukine/red_oxide/commit/f9e1d91a461cdd367999cc75bb4e34b7d26686ad))
-
-
-
-# [0.7.0](https://github.com/DevYukine/red_oxide/compare/v0.6.0...v0.7.0) (2024-01-15)
-
-
-### Bug Fixes
-
-* ignore scene releases as descening is not supported currently ([b0470f7](https://github.com/DevYukine/red_oxide/commit/b0470f7b9deb989d60ec66e919205d3f99aea598))
-* **permalink:** properly handle error when permalink can't be parsed ([d92aa0b](https://github.com/DevYukine/red_oxide/commit/d92aa0b40598d418cb41ad9c3e355d21ec4fd7f2))
-
-
-### Features
-
-* add concurrency option to specify how many tasks should run concurrently ([baee787](https://github.com/DevYukine/red_oxide/commit/baee787e820a50229a24d89fff5381a0db8ec344))
-* add skip_existing_formats_check flag ([6a7bae8](https://github.com/DevYukine/red_oxide/commit/6a7bae8690461274eb02f759ab69471adb08b25c))
-* don't fail on errors, replace forbidden folder/filename characters ([44b3486](https://github.com/DevYukine/red_oxide/commit/44b3486738a590ff1b7b5cec18a7b607d1fbc222))
-* **lossy:** add a warning that lossy web/master transcode require manual report ([784a01f](https://github.com/DevYukine/red_oxide/commit/784a01f659d140da55071886d385eda406c0d096))
-
-
-### Performance Improvements
-
-* **spectrograms:** add support for concurrency option ([1ecf337](https://github.com/DevYukine/red_oxide/commit/1ecf3377fa4fda9808e103adb5daa34361917e48))
 
 
 
