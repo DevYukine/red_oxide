@@ -7,7 +7,6 @@ use serde::de::DeserializeOwned;
 use tower::limit::RateLimit;
 use tower::{Service, ServiceExt};
 
-use crate::built_info;
 use crate::redacted::api::constants::API_URL;
 use crate::redacted::api::error::RedactedApiError;
 use crate::redacted::api::model::{
@@ -15,89 +14,69 @@ use crate::redacted::api::model::{
     TorrentUploadResponse,
 };
 use crate::redacted::upload::TorrentUploadData;
+use crate::util::http::CLIENT;
+use crate::util::http::USER_AGENT;
 
 pub struct RedactedApi {
     client: Client,
     service: RateLimit<Client>,
+    headers: reqwest::header::HeaderMap,
 }
 
 impl RedactedApi {
-    pub fn new(api_key: String) -> Self {
-        let client = Client::builder()
-            .default_headers({
-                let mut headers = reqwest::header::HeaderMap::new();
-                headers.insert(
-                    "User-Agent",
-                    format!("{}/{} ", built_info::PKG_NAME, built_info::PKG_VERSION)
-                        .parse()
-                        .unwrap(),
-                );
-                headers.insert("Accept", "application/json".parse().unwrap());
-                headers.insert("Authorization", api_key.parse().unwrap());
-                headers
-            })
-            .build()
-            .unwrap();
+    pub fn new(api_key: String) -> anyhow::Result<Self> {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("User-Agent", USER_AGENT.parse()?);
+        headers.insert("Accept", "application/json".parse()?);
+        headers.insert("Authorization", api_key.parse()?);
+
+        let client = CLIENT.clone();
 
         let service = tower::ServiceBuilder::new()
             .rate_limit(10, Duration::from_secs(10))
             .service(client.clone());
 
-        Self { client, service }
+        Ok(Self {
+            client,
+            service,
+            headers,
+        })
     }
 
     pub async fn index(&mut self) -> anyhow::Result<ApiResponse<IndexResponse>> {
-        let req = self
-            .client
-            .request(Method::GET, Url::parse(API_URL)?)
-            .query(&vec![("action", "index")])
-            .build()?;
-
-        let res = self.service.ready().await?.call(req).await?;
-
-        Ok(self
-            .handle_status_and_parse_body::<IndexResponse>(res)
-            .await?)
+        return self
+            .do_request_parsed::<IndexResponse>(Method::GET, vec![("action", "index")])
+            .await;
     }
 
     pub async fn get_torrent_info(
         &mut self,
         torrent_id: i64,
     ) -> anyhow::Result<ApiResponse<TorrentResponse>> {
-        let req = self
-            .client
-            .request(Method::GET, Url::parse(API_URL)?)
-            .query(&vec![
-                ("action", "torrent"),
-                ("id", torrent_id.to_string().as_str()),
-            ])
-            .build()?;
-
-        let res = self.service.ready().await?.call(req).await?;
-
-        Ok(self
-            .handle_status_and_parse_body::<TorrentResponse>(res)
-            .await?)
+        return self
+            .do_request_parsed::<TorrentResponse>(
+                Method::GET,
+                vec![
+                    ("action", "torrent"),
+                    ("id", torrent_id.to_string().as_str()),
+                ],
+            )
+            .await;
     }
 
     pub async fn get_torrent_group(
         &mut self,
         group_id: i64,
     ) -> anyhow::Result<ApiResponse<TorrentGroupResponse>> {
-        let req = self
-            .client
-            .request(Method::GET, Url::parse(API_URL)?)
-            .query(&vec![
-                ("action", "torrentgroup"),
-                ("id", group_id.to_string().as_str()),
-            ])
-            .build()?;
-
-        let res = self.service.ready().await?.call(req).await?;
-
-        Ok(self
-            .handle_status_and_parse_body::<TorrentGroupResponse>(res)
-            .await?)
+        return self
+            .do_request_parsed::<TorrentGroupResponse>(
+                Method::GET,
+                vec![
+                    ("action", "torrentgroup"),
+                    ("id", group_id.to_string().as_str()),
+                ],
+            )
+            .await;
     }
 
     pub async fn download_torrent(&mut self, torrent_id: i64) -> anyhow::Result<Vec<u8>> {
@@ -108,9 +87,16 @@ impl RedactedApi {
                 ("action", "download"),
                 ("id", torrent_id.to_string().as_str()),
             ])
+            .headers(self.headers.clone())
             .build()?;
 
         let res = self.service.ready().await?.call(req).await?;
+
+        if !res.status().is_success() {
+            return Err(Error::from(RedactedApiError::DownloadError(
+                str::from_utf8(&*res.bytes().await?)?.to_string(),
+            )));
+        }
 
         Ok(res.bytes().await?.to_vec())
     }
@@ -126,6 +112,7 @@ impl RedactedApi {
             .request(Method::POST, Url::parse(API_URL)?)
             .query(&vec![("action", "upload")])
             .multipart(form)
+            .headers(self.headers.clone())
             .build()?;
 
         let res = self.service.ready().await?.call(req).await?;
@@ -139,6 +126,23 @@ impl RedactedApi {
         Ok(self
             .handle_status_and_parse_body::<TorrentUploadResponse>(res)
             .await?)
+    }
+
+    async fn do_request_parsed<T: DeserializeOwned>(
+        &mut self,
+        method: Method,
+        query: Vec<(&str, &str)>,
+    ) -> anyhow::Result<ApiResponse<T>> {
+        let req = self
+            .client
+            .request(method, Url::parse(API_URL)?)
+            .query(&query)
+            .headers(self.headers.clone())
+            .build()?;
+
+        let res = self.service.ready().await?.call(req).await?;
+
+        Ok(self.handle_status_and_parse_body::<T>(res).await?)
     }
 
     async fn handle_status_and_parse_body<T: DeserializeOwned>(
@@ -160,7 +164,8 @@ impl RedactedApi {
                 response,
             })
         } else {
-            Err(Error::from(RedactedApiError::AuthError(
+            Err(Error::from(RedactedApiError::NoSuccessStatusCodeError(
+                status,
                 parsed.error.unwrap_or("No Error Provided".to_string()),
             )))
         };
