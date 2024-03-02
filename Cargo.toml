@@ -5,6 +5,7 @@ edition = "2021"
 build = "build.rs"
 authors = ["DevYukine devyukine@gmx.de"]
 description = "A simple helper while uploading music to redacted.ch"
+homepage = "https://github.com/DevYukine/red_oxide"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
