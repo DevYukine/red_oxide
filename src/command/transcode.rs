@@ -127,17 +127,20 @@ async fn handle_url(
     let existing_formats: HashSet<ReleaseType> =
         existing_formats.into_iter().filter_map(|x| x).collect();
 
-    if !existing_formats.contains(&Flac) && !existing_formats.contains(&Flac24) {
+    let source_format = get_release_type(torrent).unwrap();
+    if source_format != Flac24 || source_format != Flac {
         term.write_line(&format!(
-            "{} Torrent {} in group {} has no FLAC base to transcode from... skipping",
-            WARNING, torrent_id, group_id
+            "{} Torrent {} in group {} is {} not FLAC... skipping",
+            WARNING, torrent_id, group_id, source_format
         ))?;
         return Ok(());
     }
 
     let transcode_formats = if cmd.skip_existing_formats_check {
-        let source_type = get_release_type(torrent).unwrap();
-        get_transcode_formats(cmd.allowed_transcode_formats, HashSet::from([source_type]))
+        get_transcode_formats(
+            cmd.allowed_transcode_formats,
+            HashSet::from([source_format]),
+        )
     } else {
         get_transcode_formats(cmd.allowed_transcode_formats, existing_formats)
     };
