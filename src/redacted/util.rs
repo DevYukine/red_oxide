@@ -5,14 +5,17 @@ use crate::redacted::models::ReleaseType::{Flac, Flac24, Mp3320, Mp3V0};
 use regex::Regex;
 use std::collections::HashSet;
 
-pub fn create_description(original_torrent_perma_url: String, transcode_command: String) -> String {
+pub fn create_description(
+    original_torrent_perma_url: String,
+    transcode_command: &String,
+) -> String {
     return format!(
         "Transcode of [url]{}[/url]\n\nTranscode process:\n[code]{}[/code]\nCreated using [url=https://github.com/DevYukine/red_oxide]red_oxide v{} by DevYukine[/url]",
         original_torrent_perma_url, transcode_command, built_info::PKG_VERSION
     );
 }
 
-pub fn perma_link(group_id: i64, torrent_id: i64) -> String {
+pub fn get_permalink(group_id: i64, torrent_id: i64) -> String {
     return format!(
         "https://redacted.ch/torrents.php?id={}&torrentid={}#torrent{}",
         group_id, torrent_id, torrent_id
@@ -85,6 +88,24 @@ pub fn get_release_type(t: &Torrent) -> Option<ReleaseType> {
             _ => None,
         },
         _ => None,
+    }
+}
+
+pub fn get_format(release_type: &ReleaseType) -> String {
+    match release_type {
+        Flac24 => "FLAC".to_string(),
+        Flac => "FLAC".to_string(),
+        Mp3320 => "MP3".to_string(),
+        Mp3V0 => "MP3".to_string(),
+    }
+}
+
+pub fn get_bitrate(release_type: &ReleaseType) -> String {
+    match release_type {
+        Flac24 => "24bit Lossless".to_string(),
+        Flac => "Lossless".to_string(),
+        Mp3320 => "320".to_string(),
+        Mp3V0 => "V0 (VBR)".to_string(),
     }
 }
 

@@ -7,8 +7,8 @@ use crate::redacted::models::ReleaseType::{Flac, Flac24, Mp3320, Mp3V0};
 use crate::redacted::models::{Category, Media, ReleaseType};
 use crate::redacted::upload::TorrentUploadData;
 use crate::redacted::util::{
-    create_description, get_existing_release_types, get_group_id_from_url, get_release_type,
-    get_torrent_id_from_url, perma_link,
+    create_description, get_bitrate, get_existing_release_types, get_format, get_group_id_from_url,
+    get_permalink, get_release_type, get_torrent_id_from_url,
 };
 use crate::tags::util::valid_tags;
 use crate::transcode::transcode::transcode_release;
@@ -414,23 +414,6 @@ async fn handle_url(
 
         let torrent_file_data = tokio::fs::read(&torrent_path).await?;
 
-        let perma_link = perma_link(group_id, torrent_id);
-        let description = create_description(perma_link.clone(), command.clone());
-
-        let format_red = match format {
-            Flac24 => "FLAC",
-            Flac => "FLAC",
-            Mp3320 => "MP3",
-            Mp3V0 => "MP3",
-        };
-
-        let bitrate = match format {
-            Flac24 => "24bit Lossless".to_string(),
-            Flac => "Lossless".to_string(),
-            Mp3320 => "320".to_string(),
-            Mp3V0 => "V0 (VBR)".to_string(),
-        };
-
         if cmd.move_transcode_to_content {
             tokio::fs::rename(&path, &content_directory.join(path.file_name().unwrap())).await?;
 
@@ -445,39 +428,36 @@ async fn handle_url(
                 "{} Manual mode enabled, skipping automatic upload",
                 PAUSE
             ))?;
-
-            let scene = if torrent.scene { "Yes" } else { "No" };
-            let format = match format {
-                Flac24 => "FLAC",
-                Flac => "FLAC",
-                Mp3320 => "MP3",
-                Mp3V0 => "MP3",
-            };
-
-            term.write_line(&*("Link: ".to_owned() + &*perma_link))?;
-            term.write_line(&*("Name: ".to_owned() + &*group.name.clone()))?;
-            term.write_line(
-                &*("Artist(s): ".to_owned()
-                    + &group
-                        .music_info
-                        .artists
-                        .iter()
-                        .map(|a| a.name.clone())
-                        .collect::<Vec<String>>()
-                        .join(", ")),
-            )?;
-            term.write_line(&*("Edition Year: ".to_owned() + &*torrent.remaster_year.to_string()))?;
-            term.write_line(&*("Edition Title: ".to_owned() + &torrent.remaster_title))?;
-            term.write_line(&*("Record Label: ".to_owned() + &torrent.remaster_record_label))?;
-            term.write_line(
-                &*("Catalogue Number: ".to_owned() + &torrent.remaster_catalogue_number),
-            )?;
-            term.write_line(&*("Scene: ".to_owned() + scene))?;
-            term.write_line(&*("Format: ".to_owned() + format))?;
-            term.write_line(&*("Bitrate: ".to_owned() + &bitrate))?;
-            term.write_line(&*("Media: ".to_owned() + &torrent.media))?;
+            term.write_line(&format!("Link: {}", get_permalink(group_id, torrent_id)))?;
+            term.write_line(&format!("Name: {}", group.name))?;
+            term.write_line(&format!(
+                "Artist(s): {}",
+                group
+                    .music_info
+                    .artists
+                    .iter()
+                    .map(|a| a.name.clone())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ))?;
+            term.write_line(&format!("Edition Year: {}", torrent.remaster_year))?;
+            term.write_line(&format!("Edition Title: {}", torrent.remaster_title))?;
+            term.write_line(&format!("Record Label: {}", torrent.remaster_record_label))?;
+            term.write_line(&format!(
+                "Catalogue Number: {}",
+                torrent.remaster_catalogue_number
+            ))?;
+            term.write_line(&format!(
+                "Scene: {}",
+                if torrent.scene { "Yes" } else { "No" }
+            ))?;
+            term.write_line(&format!("Format: {}", get_format(format)))?;
+            term.write_line(&format!("Bitrate: {}", get_bitrate(format)))?;
+            term.write_line(&format!("Media: {}", torrent.media))?;
             term.write_line("Release Description:")?;
-            term.write_line(&description)?;
+            term.write_line(
+                create_description(get_permalink(group_id, torrent_id), command).as_str(),
+            )?;
 
             let mut prompt = Confirm::new();
 
@@ -506,10 +486,10 @@ async fn handle_url(
                 remaster_title: torrent.remaster_title.clone(),
                 remaster_record_label: torrent.remaster_record_label.clone(),
                 remaster_catalogue_number: torrent.remaster_catalogue_number.clone(),
-                format: format_red.to_string(),
-                bitrate: bitrate.clone(),
+                format: get_format(format),
+                bitrate: get_bitrate(format),
                 media: torrent.media.clone(),
-                release_desc: description.clone(),
+                release_desc: create_description(get_permalink(group_id, torrent_id), command),
                 group_id: group.id as u64,
             };
 
