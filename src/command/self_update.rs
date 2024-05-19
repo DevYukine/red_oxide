@@ -1,7 +1,7 @@
 use crate::github::api::GithubApi;
 use crate::updater::constants::{GH_REPO, GH_USER};
 use crate::updater::release;
-use crate::updater::release::{ReleaseVersion, ReleaseVersionCompareResult};
+use crate::updater::release::{ReleaseVersionCompareResult};
 use crate::{ERROR, INFO, SUCCESS};
 use console::Term;
 use futures::StreamExt;
