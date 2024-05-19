@@ -24,7 +24,7 @@ pub struct RedactedApi {
 }
 
 impl RedactedApi {
-    pub fn new(api_key: String) -> anyhow::Result<Self> {
+    pub fn new(api_key: &String) -> anyhow::Result<Self> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert("User-Agent", USER_AGENT.parse()?);
         headers.insert("Accept", "application/json".parse()?);
@@ -49,6 +49,7 @@ impl RedactedApi {
             .await;
     }
 
+    #[allow(dead_code)]
     pub async fn get_torrent_info(
         &mut self,
         torrent_id: i64,
