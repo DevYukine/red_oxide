@@ -242,95 +242,24 @@ async fn handle_url(
         tokio::fs::remove_file(&tmp).await?;
     }
 
-    let spectrogram_directory = cmd.spectrogram_directory.as_ref().unwrap();
     let flacs = get_all_files_with_extension(&flac_path, ".flac").await?;
-    let flacs_count = flacs.len();
+    let flacs_count = flacs.len() as u64;
 
     if !cmd.skip_spectrogram {
-        let pb = ProgressBar::new(flacs_count as u64);
-
-        pb.set_style(
-            ProgressStyle::with_template(
-                "[{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos:>7}/{len:7} File(s)",
-            )?
-            .progress_chars("#>-"),
-        );
-
-        pb.set_message("Creating Spectrograms... (This may take a while)");
-
-        let parent = flac_path.file_name().unwrap().to_str().unwrap();
-        let to_create = spectrogram_directory.join(parent);
-
-        create_dir_all(&to_create).await?;
-
-        let semaphore = Arc::new(Semaphore::new(cmd.concurrency.unwrap()));
-        let mut tasks = vec![];
-
-        for flac in flacs {
-            let semaphore = Arc::clone(&semaphore);
-            let spectrogram_directory = spectrogram_directory.clone();
-            let flac_path = flac_path.clone();
-            let flac = flac.clone();
-            let pb = pb.clone();
-            tasks.push(tokio::spawn(async move {
-                let mut join_set = JoinSet::new();
-
-                let semaphore_clone = Arc::clone(&semaphore);
-                let spectrogram_directory_clone = spectrogram_directory.clone();
-                let flac_path_clone = flac_path.clone();
-                let flac_clone = flac.clone();
-
-                join_set.spawn(async move {
-                    let _permit = semaphore_clone.acquire().await.unwrap();
-
-                    spectrogram::spectrogram::make_spectrogram_zoom(
-                        &flac_path_clone,
-                        &flac_clone,
-                        &spectrogram_directory_clone,
-                    )
-                    .await?;
-
-                    Ok::<(), anyhow::Error>(())
-                });
-
-                let semaphore_clone = Arc::clone(&semaphore);
-                let spectrogram_directory_clone = spectrogram_directory.clone();
-                let flac_path_clone = flac_path.clone();
-                let flac_clone = flac.clone();
-                join_set.spawn(async move {
-                    let _permit = semaphore_clone.acquire().await.unwrap();
-
-                    spectrogram::spectrogram::make_spectrogram_full(
-                        &flac_path_clone,
-                        &flac_clone,
-                        &spectrogram_directory_clone,
-                    )
-                    .await?;
-
-                    Ok::<(), anyhow::Error>(())
-                });
-
-                while let Some(result) = join_set.join_next().await {
-                    result??;
-                }
-
-                pb.inc(1);
-
-                Ok::<(), anyhow::Error>(())
-            }));
+        let spectrogram_directory = cmd.spectrogram_directory.as_ref().unwrap();
+        let concurrency = cmd.concurrency.unwrap();
+        let result =
+            create_spectrograms(&flacs, &flac_path, spectrogram_directory, concurrency).await;
+        if result.is_err() {
+            return Ok(());
         }
 
-        for task in tasks {
-            task.await??;
-        }
+        term.write_line(&*format!(
+            "{} Created Spectrograms at {}, please manual check if FLAC is lossless before continuing!",
+            PAUSE, spectrogram_directory.to_str().unwrap()
+        ))?;
 
-        let mut prompt = Confirm::new();
-
-        pb.finish_and_clear();
-
-        term.write_line(&*format!("{} Created Spectrograms at {}, please manual check if FLAC is lossless before continuing!", PAUSE, to_create.to_str().unwrap()))?;
-
-        prompt = prompt
+        let prompt = Confirm::new()
             .with_prompt("Do those spectrograms look good?")
             .default(true);
 
@@ -342,7 +271,7 @@ async fn handle_url(
                 ERROR, torrent_id, group_id
             ))?;
             return Ok(());
-        }
+        };
     }
 
     if transcode::util::is_multichannel(&flac_path).await? {
@@ -361,7 +290,7 @@ async fn handle_url(
     .progress_chars("##-");
 
     let pb_main = multi_progress.add(ProgressBar::new(
-        (flacs_count * transcode_formats.len()) as u64,
+        flacs_count * transcode_formats.len() as u64,
     ));
     pb_main.set_style(sty.clone());
     pb_main.set_message("Total");
@@ -376,8 +305,7 @@ async fn handle_url(
     let transcode_directory = cmd.transcode_directory.as_ref().unwrap();
 
     for format in &transcode_formats {
-        let pb_format =
-            multi_progress.insert_before(&pb_main, ProgressBar::new(flacs_count as u64));
+        let pb_format = multi_progress.insert_before(&pb_main, ProgressBar::new(flacs_count));
         pb_format.set_style(sty.clone());
 
         let transcode_format_str = match format {
@@ -606,9 +534,99 @@ fn get_transcode_formats(
         .collect()
 }
 
+async fn create_spectrograms(
+    flacs: &Vec<PathBuf>,
+    flac_path: &PathBuf,
+    spectrogram_directory: &PathBuf,
+    concurrency: usize,
+) -> anyhow::Result<()> {
+    let pb = ProgressBar::new(flacs.len() as u64);
+
+    pb.set_style(
+        ProgressStyle::with_template(
+            "[{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos:>7}/{len:7} File(s)",
+        )?
+        .progress_chars("#>-"),
+    );
+
+    pb.set_message("Creating Spectrograms... (This may take a while)");
+
+    let parent = flac_path.file_name().unwrap().to_str().unwrap();
+    let to_create = spectrogram_directory.join(parent);
+
+    create_dir_all(&to_create).await?;
+
+    let semaphore = Arc::new(Semaphore::new(concurrency));
+    let mut tasks = vec![];
+
+    for flac in flacs {
+        let semaphore = Arc::clone(&semaphore);
+        let spectrogram_directory = spectrogram_directory.clone();
+        let flac_path = flac_path.clone();
+        let flac = flac.clone();
+        let pb = pb.clone();
+        tasks.push(tokio::spawn(async move {
+            let mut join_set = JoinSet::new();
+
+            let semaphore_clone = Arc::clone(&semaphore);
+            let spectrogram_directory_clone = spectrogram_directory.clone();
+            let flac_path_clone = flac_path.clone();
+            let flac_clone = flac.clone();
+
+            join_set.spawn(async move {
+                let _permit = semaphore_clone.acquire().await.unwrap();
+
+                spectrogram::spectrogram::make_spectrogram_zoom(
+                    &flac_path_clone,
+                    &flac_clone,
+                    &spectrogram_directory_clone,
+                )
+                .await?;
+
+                Ok::<(), anyhow::Error>(())
+            });
+
+            let semaphore_clone = Arc::clone(&semaphore);
+            let spectrogram_directory_clone = spectrogram_directory.clone();
+            let flac_path_clone = flac_path.clone();
+            let flac_clone = flac.clone();
+            join_set.spawn(async move {
+                let _permit = semaphore_clone.acquire().await.unwrap();
+
+                spectrogram::spectrogram::make_spectrogram_full(
+                    &flac_path_clone,
+                    &flac_clone,
+                    &spectrogram_directory_clone,
+                )
+                .await?;
+
+                Ok::<(), anyhow::Error>(())
+            });
+
+            while let Some(result) = join_set.join_next().await {
+                result??;
+            }
+
+            pb.inc(1);
+
+            Ok::<(), anyhow::Error>(())
+        }));
+    }
+
+    for task in tasks {
+        task.await??;
+    }
+
+    pb.finish_and_clear();
+
+    return Ok(());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::env::current_dir;
+    use std::time::SystemTime;
 
     #[test]
     fn get_transcode_formats_from_flac24_skips_existing() {
@@ -659,5 +677,62 @@ mod tests {
         let existing_formats = HashSet::from([Flac, Mp3320]);
         let result = get_transcode_formats(&allowed_transcode_formats, existing_formats);
         assert_eq!(result, []);
+    }
+
+    #[tokio::test]
+    async fn create_spectrograms_test() {
+        let flac_path = get_flacs_sample_dir();
+        let flacs = get_flacs(&flac_path);
+        let hello = current_dir().unwrap();
+        println!("Current dir: {}", hello.to_str().unwrap());
+        let timestamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            .to_string();
+        let spectrogram_directory = temp_dir().join("spectrograms").join(timestamp);
+        let concurrency = 2;
+        let result =
+            create_spectrograms(&flacs, &flac_path, &spectrogram_directory, concurrency).await;
+        assert!(result.is_ok());
+        let generated_files: Vec<PathBuf> = read_dir_recursive(&spectrogram_directory);
+        assert_eq!(generated_files.len(), flacs.len() * 2);
+    }
+
+    fn get_flacs_sample_dir() -> PathBuf {
+        std::fs::read_dir("samples/flacs")
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path.is_dir())
+            .nth(0)
+            .unwrap()
+    }
+
+    fn get_flacs(flac_path: &PathBuf) -> Vec<PathBuf> {
+        // Get the content
+        let files: Vec<PathBuf> = std::fs::read_dir(flac_path)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path.extension().unwrap_or_default() == "flac")
+            .collect();
+        if files.len() == 0 {
+            panic!("No flac files found in the sample directory");
+        }
+        return files;
+    }
+
+    fn read_dir_recursive(directory_path: &PathBuf) -> Vec<PathBuf> {
+        std::fs::read_dir(directory_path)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .map(|entry| {
+                if entry.is_dir() {
+                    read_dir_recursive(&entry)
+                } else {
+                    vec![entry]
+                }
+            })
+            .flatten()
+            .collect()
     }
 }
