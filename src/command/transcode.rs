@@ -258,93 +258,6 @@ async fn handle_url(
         return Ok(());
     }
 
-    let multi_progress = MultiProgress::with_draw_target(ProgressDrawTarget::stdout());
-    let sty = ProgressStyle::with_template(
-        "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
-    )
-    .unwrap()
-    .progress_chars("##-");
-
-    let pb_main = multi_progress.add(ProgressBar::new(
-        flacs_count * transcode_formats.len() as u64,
-    ));
-    pb_main.set_style(sty.clone());
-    pb_main.set_message("Total");
-
-    pb_main.tick();
-
-    let semaphore = Arc::new(Semaphore::new(cmd.concurrency.unwrap()));
-    let mut join_set = JoinSet::new();
-
-    multi_progress.println("[➡️] Transcoding...").unwrap();
-
-    let transcode_directory = cmd.transcode_directory.as_ref().unwrap();
-
-    let base_name = get_base_name(group.clone(), torrent.clone());
-
-    for format in &transcode_formats {
-        let pb_format = multi_progress.insert_before(&pb_main, ProgressBar::new(flacs_count));
-        pb_format.set_style(sty.clone());
-
-        let transcode_format_str = match format {
-            Flac24 => "FLAC 24bit",
-            Flac => "FLAC",
-            Mp3320 => "MP3 - 320",
-            Mp3V0 => "MP3 - V0",
-        };
-
-        let transcode_release_name = format!(
-            "{} ({} - {})",
-            base_name,
-            torrent.media.to_uppercase(),
-            transcode_format_str
-        );
-
-        let flac_path_clone = flac_path.clone();
-        let torrent_id_clone = torrent_id.clone();
-        let term = Arc::new(term.clone());
-        let mut output_dir = transcode_directory.clone();
-        let format = format.clone();
-        let pb_main_clone = pb_main.clone();
-        let semaphore_clone = semaphore.clone();
-        join_set.spawn(tokio::spawn(async move {
-            let (folder_path, command) = transcode_release(
-                &flac_path_clone,
-                &mut output_dir,
-                transcode_release_name.clone(),
-                format,
-                term,
-                torrent_id_clone,
-                pb_format,
-                pb_main_clone,
-                semaphore_clone,
-            )
-            .await?;
-
-            let transcode_folder_path = output_dir.join(&folder_path);
-
-            copy_other_allowed_files(&flac_path_clone, &flac_path_clone, &transcode_folder_path)
-                .await?;
-
-            return Ok::<(PathBuf, ReleaseType, String), anyhow::Error>((
-                folder_path,
-                format,
-                command,
-            ));
-        }));
-    }
-
-    let mut path_format_command_triple = Vec::new();
-
-    while let Some(res) = join_set.join_next().await {
-        let transcode_folder = res???;
-
-        path_format_command_triple.push(transcode_folder);
-    }
-
-    multi_progress.println(format!("{} Transcoding Done!", SUCCESS))?;
-    multi_progress.clear()?;
-
     if invalid_track_number_vinyl {
         let mut prompt = Confirm::new();
 
@@ -354,6 +267,22 @@ async fn handle_url(
 
         prompt.interact()?;
     }
+
+    let transcode_directory = cmd.transcode_directory.as_ref().unwrap();
+    let base_name = get_base_name(&group, torrent);
+
+    let path_format_command_triple = transcode_flacs(
+        flacs_count,
+        &transcode_formats,
+        &flac_path,
+        transcode_directory,
+        base_name,
+        torrent_id,
+        &torrent.media,
+        cmd.concurrency.unwrap(),
+        term,
+    )
+    .await?;
 
     let torrent_directory = cmd.torrent_directory.as_ref().unwrap();
 
@@ -491,7 +420,8 @@ fn get_transcode_formats(
         .cloned()
         .collect()
 }
-fn get_base_name(group: Group, torrent: Torrent) -> String {
+
+fn get_base_name(group: &Group, torrent: &Torrent) -> String {
     let artist = if group.music_info.artists.len() > 1 {
         "Various Artists".to_string()
     } else {
@@ -606,6 +536,103 @@ async fn create_spectrograms(
     return Ok(());
 }
 
+async fn transcode_flacs(
+    flacs_count: u64,
+    transcode_formats: &Vec<ReleaseType>,
+    flac_path: &PathBuf,
+    transcode_directory: &PathBuf,
+    base_name: String,
+    torrent_id: i64,
+    media: &String,
+    concurrency: usize,
+    term: &Term,
+) -> anyhow::Result<Vec<(PathBuf, ReleaseType, String)>> {
+    let multi_progress = MultiProgress::with_draw_target(ProgressDrawTarget::stdout());
+    let sty = ProgressStyle::with_template(
+        "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+    )
+    .unwrap()
+    .progress_chars("##-");
+
+    let pb_main = multi_progress.add(ProgressBar::new(
+        flacs_count * transcode_formats.len() as u64,
+    ));
+    pb_main.set_style(sty.clone());
+    pb_main.set_message("Total");
+
+    pb_main.tick();
+
+    let semaphore = Arc::new(Semaphore::new(concurrency));
+    let mut join_set = JoinSet::new();
+
+    multi_progress.println("[➡️] Transcoding...").unwrap();
+
+    for format in transcode_formats {
+        let pb_format = multi_progress.insert_before(&pb_main, ProgressBar::new(flacs_count));
+        pb_format.set_style(sty.clone());
+
+        let transcode_format_str = match format {
+            Flac24 => "FLAC 24bit",
+            Flac => "FLAC",
+            Mp3320 => "MP3 - 320",
+            Mp3V0 => "MP3 - V0",
+        };
+
+        let transcode_release_name = format!(
+            "{} ({} - {})",
+            base_name,
+            media.to_uppercase(),
+            transcode_format_str
+        );
+
+        let flac_path_clone = flac_path.clone();
+        let torrent_id_clone = torrent_id.clone();
+        let term = Arc::new(term.clone());
+        let mut output_dir = transcode_directory.clone();
+        let format = format.clone();
+        let pb_main_clone = pb_main.clone();
+        let semaphore_clone = semaphore.clone();
+        join_set.spawn(tokio::spawn(async move {
+            let (folder_path, command) = transcode_release(
+                &flac_path_clone,
+                &mut output_dir,
+                transcode_release_name.clone(),
+                format,
+                term,
+                torrent_id_clone,
+                pb_format,
+                pb_main_clone,
+                semaphore_clone,
+            )
+            .await?;
+
+            let transcode_folder_path = output_dir.join(&folder_path);
+
+            copy_other_allowed_files(&flac_path_clone, &flac_path_clone, &transcode_folder_path)
+                .await?;
+
+            return Ok::<(PathBuf, ReleaseType, String), anyhow::Error>((
+                folder_path,
+                format,
+                command,
+            ));
+        }));
+    }
+
+    let mut path_format_command_triple = Vec::new();
+
+    while let Some(res) = join_set.join_next().await {
+        let transcode_folder = res???;
+
+        path_format_command_triple.push(transcode_folder);
+    }
+
+    multi_progress.println(format!("{} Transcoding Done!", SUCCESS))?;
+    multi_progress.clear()?;
+
+    Ok(path_format_command_triple)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -669,18 +696,45 @@ mod tests {
         let flacs = get_flacs(&flac_path);
         let hello = current_dir().unwrap();
         println!("Current dir: {}", hello.to_str().unwrap());
-        let timestamp = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            .to_string();
-        let spectrogram_directory = temp_dir().join("spectrograms").join(timestamp);
-        let concurrency = 2;
-        let result =
-            create_spectrograms(&flacs, &flac_path, &spectrogram_directory, concurrency).await;
+        let output_dir = get_temp_dir("spectrograms");
+        let concurrency = num_cpus::get();
+        let result = create_spectrograms(&flacs, &flac_path, &output_dir, concurrency).await;
         assert!(result.is_ok());
-        let generated_files: Vec<PathBuf> = read_dir_recursive(&spectrogram_directory);
+        let generated_files: Vec<PathBuf> = read_dir_recursive(&output_dir);
         assert_eq!(generated_files.len(), flacs.len() * 2);
+    }
+
+    #[tokio::test]
+    async fn transcode_flacs_test() {
+        let flac_path = get_flacs_sample_dir();
+        let flacs_count = get_flacs(&flac_path).len() as u64;
+        let transcode_formats = vec![Mp3320, Mp3V0];
+        let output_dir = create_temp_dir("transcodes");
+        let base_name = "Hello World".to_string();
+        let torrent_id = 123456;
+        let media = "WEB".to_string();
+        let concurrency = num_cpus::get();
+        let term = Term::stdout();
+        let result = transcode_flacs(
+            flacs_count,
+            &transcode_formats,
+            &flac_path,
+            &output_dir,
+            base_name,
+            torrent_id,
+            &media,
+            concurrency,
+            &term,
+        )
+        .await
+        .unwrap();
+        let expected_count = flacs_count as usize * transcode_formats.len();
+        assert_eq!(result.len(), 2);
+        let generated_files: Vec<PathBuf> = read_dir_recursive(&output_dir)
+            .into_iter()
+            .filter(|path| path.extension().unwrap_or_default() == "mp3")
+            .collect();
+        assert_eq!(generated_files.len(), expected_count);
     }
 
     fn get_flacs_sample_dir() -> PathBuf {
@@ -718,5 +772,20 @@ mod tests {
             })
             .flatten()
             .collect()
+    }
+
+    fn get_temp_dir(sub_dir_name: &str) -> PathBuf {
+        let timestamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            .to_string();
+        temp_dir().join(sub_dir_name).join(timestamp)
+    }
+
+    fn create_temp_dir(sub_dir_name: &str) -> PathBuf {
+        let dir = get_temp_dir(sub_dir_name);
+        std::fs::create_dir_all(&dir).unwrap();
+        return dir;
     }
 }
