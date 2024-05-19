@@ -130,7 +130,7 @@ async fn handle_url(
         existing_formats.into_iter().filter_map(|x| x).collect();
 
     let source_format = get_release_type(torrent).unwrap();
-    if source_format != Flac24 || source_format != Flac {
+    if source_format != Flac24 && source_format != Flac {
         term.write_line(&format!(
             "{} Torrent {} in group {} is {} not FLAC... skipping",
             WARNING, torrent_id, group_id, source_format
