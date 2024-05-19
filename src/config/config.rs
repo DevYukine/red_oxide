@@ -104,11 +104,12 @@ fn get_home_env() -> Option<String> {
     None
 }
 
-pub async fn apply_config(cmd: &mut TranscodeCommand, term: &Term) -> anyhow::Result<()> {
+pub async fn apply_config(cmd: &TranscodeCommand, term: &Term) -> anyhow::Result<TranscodeCommand> {
     let found_config = match &cmd.config_file {
         None => search_config_in_default_locations()?,
         Some(config_file) => Some(config_file.clone()),
     };
+    let mut cmd = cmd.clone();
 
     if let Some(config_path) = found_config {
         let mut file = File::open(config_path).await?;
@@ -161,12 +162,20 @@ pub async fn apply_config(cmd: &mut TranscodeCommand, term: &Term) -> anyhow::Re
         }
     }
 
-    verify_final_config(cmd, term)?;
+    if cmd.allowed_transcode_formats.is_empty() {
+        cmd.allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
+    }
 
-    Ok(())
+    if cmd.concurrency.is_none() {
+        cmd.concurrency = Some(num_cpus::get());
+    }
+
+    verify_final_config(&cmd, term)?;
+
+    Ok(cmd.clone())
 }
 
-pub fn verify_final_config(cmd: &mut TranscodeCommand, term: &Term) -> anyhow::Result<()> {
+fn verify_final_config(cmd: &TranscodeCommand, term: &Term) -> anyhow::Result<()> {
     if cmd.api_key.is_none() {
         term.write_line(&format!(
             "{} You have to specify API key either as argument or in the config file",
@@ -205,14 +214,6 @@ pub fn verify_final_config(cmd: &mut TranscodeCommand, term: &Term) -> anyhow::R
             ERROR
         ))?;
         std::process::exit(1);
-    }
-
-    if cmd.allowed_transcode_formats.is_empty() {
-        cmd.allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
-    }
-
-    if cmd.concurrency.is_none() {
-        cmd.concurrency = Some(num_cpus::get());
     }
 
     Ok(())

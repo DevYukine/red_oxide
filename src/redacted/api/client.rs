@@ -24,7 +24,7 @@ pub struct RedactedApi {
 }
 
 impl RedactedApi {
-    pub fn new(api_key: String) -> anyhow::Result<Self> {
+    pub fn new(api_key: &String) -> anyhow::Result<Self> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert("User-Agent", USER_AGENT.parse()?);
         headers.insert("Accept", "application/json".parse()?);

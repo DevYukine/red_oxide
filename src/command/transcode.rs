@@ -26,10 +26,10 @@ use tokio::fs::create_dir_all;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
-pub async fn transcode(mut cmd: TranscodeCommand, term: &Term) -> anyhow::Result<()> {
-    apply_config(&mut cmd, term).await?;
+pub async fn transcode(cmd: &TranscodeCommand, term: &Term) -> anyhow::Result<()> {
+    let cmd = apply_config(&cmd, term).await?;
 
-    let mut api = RedactedApi::new(cmd.api_key.clone().unwrap())?;
+    let mut api = RedactedApi::new(cmd.api_key.as_ref().unwrap())?;
     let index_response = api.index().await?.response;
 
     term.write_line(&format!(
@@ -37,12 +37,13 @@ pub async fn transcode(mut cmd: TranscodeCommand, term: &Term) -> anyhow::Result
         SUCCESS, index_response.username
     ))?;
 
-    for url in cmd.urls.clone() {
+    let urls = &cmd.urls;
+    for url in urls {
         let result = handle_url(
             url.as_str(),
             term,
             &mut api,
-            cmd.clone(),
+            &cmd,
             index_response.passkey.clone(),
         )
         .await;
@@ -62,7 +63,7 @@ async fn handle_url(
     url: &str,
     term: &Term,
     api: &mut RedactedApi,
-    mut cmd: TranscodeCommand,
+    cmd: &TranscodeCommand,
     passkey: String,
 ) -> anyhow::Result<()> {
     let group_id = get_group_id_from_url(url);
@@ -138,11 +139,11 @@ async fn handle_url(
 
     let transcode_formats = if cmd.skip_existing_formats_check {
         get_transcode_formats(
-            cmd.allowed_transcode_formats,
+            &cmd.allowed_transcode_formats,
             HashSet::from([source_format]),
         )
     } else {
-        get_transcode_formats(cmd.allowed_transcode_formats, existing_formats)
+        get_transcode_formats(&cmd.allowed_transcode_formats, existing_formats)
     };
 
     if transcode_formats.is_empty() {
@@ -189,7 +190,7 @@ async fn handle_url(
     };
     let base_name = raw_base_name.replace(&FORBIDDEN_CHARACTERS[..], "_");
 
-    let content_directory = cmd.content_directory.unwrap();
+    let content_directory = cmd.content_directory.as_ref().unwrap();
 
     let flac_path = content_directory.join(decode_html_entities(&torrent.file_path).to_string());
 
@@ -197,12 +198,12 @@ async fn handle_url(
 
     let (valid, invalid_track_number_vinyl) = valid_tags(&flac_path, &media).await?;
 
+    let mut manual_upload_required = false;
     if !valid && invalid_track_number_vinyl {
         term.write_line(&format!(
             "{} Release is Vinyl and has either no set track number or in a non standard format (e.g. A1, A2 etc), you will be prompted once transcode is done to manually check & adjust the transcode tags as needed!", WARNING
         ))?;
-
-        cmd.automatic_upload = false;
+        manual_upload_required = true;
     } else if !valid {
         term.write_line(&format!(
             "{} Torrent {} in group {} has FLAC files with invalid tags, skipping...\n You might be able to trump it.",
@@ -241,7 +242,7 @@ async fn handle_url(
         tokio::fs::remove_file(&tmp).await?;
     }
 
-    let spectrogram_directory = cmd.spectrogram_directory.unwrap();
+    let spectrogram_directory = cmd.spectrogram_directory.as_ref().unwrap();
     let flacs = get_all_files_with_extension(&flac_path, ".flac").await?;
     let flacs_count = flacs.len();
 
@@ -372,7 +373,7 @@ async fn handle_url(
 
     multi_progress.println("[➡️] Transcoding...").unwrap();
 
-    let transcode_directory = cmd.transcode_directory.unwrap();
+    let transcode_directory = cmd.transcode_directory.as_ref().unwrap();
 
     for format in &transcode_formats {
         let pb_format =
@@ -448,7 +449,7 @@ async fn handle_url(
         prompt.interact()?;
     }
 
-    let torrent_directory = cmd.torrent_directory.unwrap();
+    let torrent_directory = cmd.torrent_directory.as_ref().unwrap();
 
     for (path, format, command) in &path_format_command_triple {
         let release_name = path.file_name().unwrap().to_str().unwrap();
@@ -511,7 +512,7 @@ async fn handle_url(
             ))?;
         }
 
-        if !cmd.automatic_upload {
+        if !cmd.automatic_upload || manual_upload_required {
             term.write_line(&*format!(
                 "{} Manual mode enabled, skipping automatic upload",
                 PAUSE
@@ -594,7 +595,7 @@ async fn handle_url(
 }
 
 fn get_transcode_formats(
-    allowed_transcode_formats: Vec<ReleaseType>,
+    allowed_transcode_formats: &Vec<ReleaseType>,
     existing_formats: HashSet<ReleaseType>,
 ) -> Vec<ReleaseType> {
     allowed_transcode_formats
@@ -613,7 +614,7 @@ mod tests {
     fn get_transcode_formats_from_flac24_skips_existing() {
         let allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
         let existing_formats = HashSet::from([Flac24, Mp3320]);
-        let result = get_transcode_formats(allowed_transcode_formats, existing_formats);
+        let result = get_transcode_formats(&allowed_transcode_formats, existing_formats);
         assert_eq!(result, [Flac, Mp3V0]);
     }
 
@@ -621,7 +622,7 @@ mod tests {
     fn get_transcode_formats_from_flac_skips_existing() {
         let allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
         let existing_formats = HashSet::from([Flac, Mp3320]);
-        let result = get_transcode_formats(allowed_transcode_formats, existing_formats);
+        let result = get_transcode_formats(&allowed_transcode_formats, existing_formats);
         assert_eq!(result, [Mp3V0]);
     }
 
@@ -630,7 +631,7 @@ mod tests {
         let allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
         let source_format = Flac;
         let existing_formats = HashSet::from([source_format]);
-        let result = get_transcode_formats(allowed_transcode_formats, existing_formats);
+        let result = get_transcode_formats(&allowed_transcode_formats, existing_formats);
         // TODO: Why is Flac not included?
         assert_eq!(result, [Mp3320, Mp3V0]);
     }
@@ -640,7 +641,7 @@ mod tests {
         let allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
         let source_format = Flac;
         let existing_formats = HashSet::from([source_format]);
-        let result = get_transcode_formats(allowed_transcode_formats, existing_formats);
+        let result = get_transcode_formats(&allowed_transcode_formats, existing_formats);
         assert_eq!(result, [Mp3320, Mp3V0]);
     }
 
@@ -648,7 +649,7 @@ mod tests {
     fn get_transcode_formats_from_flac_applies_allowed() {
         let allowed_transcode_formats = vec![Mp3320, Mp3V0];
         let existing_formats = HashSet::from([Flac, Mp3320]);
-        let result = get_transcode_formats(allowed_transcode_formats, existing_formats);
+        let result = get_transcode_formats(&allowed_transcode_formats, existing_formats);
         assert_eq!(result, [Mp3V0]);
     }
 
@@ -656,7 +657,7 @@ mod tests {
     fn get_transcode_formats_from_flac_applies_allowed_none() {
         let allowed_transcode_formats = vec![Mp3320];
         let existing_formats = HashSet::from([Flac, Mp3320]);
-        let result = get_transcode_formats(allowed_transcode_formats, existing_formats);
+        let result = get_transcode_formats(&allowed_transcode_formats, existing_formats);
         assert_eq!(result, []);
     }
 }
