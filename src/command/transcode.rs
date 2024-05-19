@@ -6,6 +6,7 @@ use crate::redacted::api::path::is_path_exceeding_redacted_path_limit;
 use crate::redacted::models::ReleaseType::{Flac, Flac24, Mp3320, Mp3V0};
 use crate::redacted::models::{Category, Media, ReleaseType};
 use crate::redacted::upload::TorrentUploadData;
+use crate::redacted::util;
 use crate::redacted::util::{create_description, perma_link};
 use crate::tags::util::valid_tags;
 use crate::transcode::transcode::transcode_release;
@@ -15,8 +16,6 @@ use console::Term;
 use dialoguer::{Confirm, Input};
 use html_escape::decode_html_entities;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::collections::HashSet;
 use std::env::temp_dir;
 use std::path::PathBuf;
@@ -65,27 +64,17 @@ async fn handle_url(
     mut cmd: TranscodeCommand,
     passkey: String,
 ) -> anyhow::Result<()> {
-    lazy_static! {
-        static ref REDACTED_PERMA_LINK_REGEX: Regex = regex::Regex::new(
-            r"(https://|http://)?redacted\.ch/torrents\.php\?id=(\d+)&torrentid=(\d+)"
-        )
-        .unwrap();
+    let group_id = util::get_group_id_from_url(url);
+    let torrent_id = util::get_torrent_id_from_url(url);
+    if group_id.is_none() || torrent_id.is_none() {
+        term.write_line(&format!(
+            "{} Could not parse permalink {}, please make sure you are using a valid permalink including group id and torrent id",
+            ERROR, url
+        ))?;
+        return Ok(());
     }
-
-    let captures = match REDACTED_PERMA_LINK_REGEX.captures(url) {
-        None => {
-            term.write_line(&format!(
-                "{} Could not parse permalink {}, please make sure you are using a valid permalink including group id and torrent id",
-                ERROR, url
-            ))?;
-            return Ok(());
-        }
-        Some(c) => c,
-    };
-
-    let group_id = captures.get(2).unwrap().as_str().parse::<i64>().unwrap();
-    let torrent_id = captures.get(3).unwrap().as_str().parse::<i64>().unwrap();
-
+    let group_id = group_id.unwrap();
+    let torrent_id = torrent_id.unwrap();
     term.write_line(&format!(
         "{} Got torrent {} from group {}",
         SUCCESS, torrent_id, group_id
