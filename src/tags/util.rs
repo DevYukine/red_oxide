@@ -59,7 +59,7 @@ pub fn validate_tags_of_file(path: PathBuf, media: &Media) -> anyhow::Result<(bo
         return Ok((false, false));
     }
 
-    let (track_number, total_tracks) = tag.track();
+    let (track_number, _total_tracks) = tag.track();
 
     if track_number.is_none() {
         return Ok((false, media == &Vinyl));
