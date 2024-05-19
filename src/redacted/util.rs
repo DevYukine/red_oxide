@@ -1,5 +1,9 @@
 use crate::built_info;
+use crate::redacted::api::model::Torrent;
+use crate::redacted::models::ReleaseType;
+use crate::redacted::models::ReleaseType::{Flac, Flac24, Mp3320, Mp3V0};
 use regex::Regex;
+use std::collections::HashSet;
 
 pub fn create_description(original_torrent_perma_url: String, transcode_command: String) -> String {
     return format!(
@@ -50,6 +54,38 @@ fn get_torrent_id_from_torrent_url(url: &str) -> Option<i64> {
         .as_str()
         .parse::<i64>()
         .ok()
+}
+
+pub fn get_existing_release_types(
+    torrent: &Torrent,
+    group_torrents: &Vec<Torrent>,
+) -> HashSet<Option<ReleaseType>> {
+    group_torrents
+        .iter()
+        .filter(|t| {
+            t.remaster_title == torrent.remaster_title
+                && t.remaster_record_label == torrent.remaster_record_label
+                && t.media == torrent.media
+                && t.remaster_catalogue_number == torrent.remaster_catalogue_number
+        })
+        .map(|t| get_release_type(t))
+        .collect()
+}
+
+fn get_release_type(t: &Torrent) -> Option<ReleaseType> {
+    match t.format.as_str() {
+        "FLAC" => match t.encoding.as_str() {
+            "Lossless" => Some(Flac),
+            "24bit Lossless" => Some(Flac24),
+            _ => None,
+        },
+        "MP3" => match t.encoding.as_str() {
+            "320" => Some(Mp3320),
+            "V0 (VBR)" => Some(Mp3V0),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 #[cfg(test)]

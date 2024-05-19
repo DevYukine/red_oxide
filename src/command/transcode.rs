@@ -7,7 +7,7 @@ use crate::redacted::models::ReleaseType::{Flac, Flac24, Mp3320, Mp3V0};
 use crate::redacted::models::{Category, Media, ReleaseType};
 use crate::redacted::upload::TorrentUploadData;
 use crate::redacted::util;
-use crate::redacted::util::{create_description, perma_link};
+use crate::redacted::util::{create_description, get_existing_release_types, perma_link};
 use crate::tags::util::valid_tags;
 use crate::transcode::transcode::transcode_release;
 use crate::transcode::util::copy_other_allowed_files;
@@ -115,54 +115,16 @@ async fn handle_url(
         ))?;
     }
 
-    let mut existing_formats = HashSet::new();
-
-    group_torrents
-        .iter()
-        .filter(|t| t.remaster_title == torrent.remaster_title
-            && t.remaster_record_label == torrent.remaster_record_label
-            && t.media == torrent.media
-            && t.remaster_catalogue_number == torrent.remaster_catalogue_number)
-        .for_each(|t| {
-            match t.format.as_str() {
-                "FLAC" => match t.encoding.as_str() {
-                    "Lossless" => {
-                        existing_formats.insert(Flac);
-                    }
-                    "24bit Lossless" => {
-                        existing_formats.insert(Flac24);
-                    },
-                    _ => {
-                        term.write_line(&format!(
-                            "{} Unknown encoding {} for torrent {} in group {}, this shouldn't happen...",
-                            ERROR, t.encoding, t.id, group_id
-                        )).unwrap();
-                    }
-                },
-                "MP3" => {
-                    match t.encoding.as_str() {
-                        "320" => {
-                            existing_formats.insert(Mp3320);
-                        }
-                        "V0 (VBR)" => {
-                            existing_formats.insert(Mp3V0);
-                        }
-                        _ => {
-                            term.write_line(&format!(
-                                "{} Unknown encoding {} for torrent {} in group {}, this shouldn't happen...",
-                                ERROR, t.encoding, t.id, group_id
-                            )).unwrap();
-                        }
-                    }
-                }
-                _ => {
-                    term.write_line(&format!(
-                        "{} Unknown format {} for torrent {} in group {}, this shouldn't happen...",
-                        ERROR, t.format, t.id, group_id
-                    )).unwrap();
-                }
-            }
-        });
+    let existing_formats = get_existing_release_types(torrent, &group_torrents);
+    if existing_formats.contains(&None) {
+        term.write_line(&format!(
+            "{} Unknown encoding for torrent {} in group {}, this shouldn't happen...",
+            ERROR, torrent.id, group_id
+        ))
+        .unwrap();
+    }
+    let existing_formats: HashSet<ReleaseType> =
+        existing_formats.into_iter().filter_map(|x| x).collect();
 
     if !existing_formats.contains(&Flac) && !existing_formats.contains(&Flac24) {
         term.write_line(&format!(
