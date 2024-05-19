@@ -2,6 +2,7 @@ use crate::config::config::apply_config;
 use crate::fs::util::get_all_files_with_extension;
 use crate::redacted::api::client::RedactedApi;
 use crate::redacted::api::constants::{FORBIDDEN_CHARACTERS, TRACKER_URL};
+use crate::redacted::api::model::{Group, Torrent};
 use crate::redacted::api::path::is_path_exceeding_redacted_path_limit;
 use crate::redacted::models::ReleaseType::{Flac, Flac24, Mp3320, Mp3V0};
 use crate::redacted::models::{Category, Media, ReleaseType};
@@ -165,31 +166,6 @@ async fn handle_url(
         group_id
     ))?;
 
-    let artist = if group.music_info.artists.len() > 1 {
-        "Various Artists".to_string()
-    } else {
-        group.music_info.artists[0].name.clone()
-    };
-
-    let mut year = torrent.remaster_year;
-
-    // Fixes edge case where remaster year is 0 (likely unintentional)
-    if year == 0 {
-        year = group.year;
-    }
-
-    let group_name = group.name.replace(":", "");
-
-    let raw_base_name = if torrent.remaster_title.len() > 1 {
-        format!(
-            "{} - {} ({}) [{}]",
-            artist, group_name, torrent.remaster_title, year
-        )
-    } else {
-        format!("{} - {} [{}]", artist, group_name, year)
-    };
-    let base_name = raw_base_name.replace(&FORBIDDEN_CHARACTERS[..], "_");
-
     let content_directory = cmd.content_directory.as_ref().unwrap();
 
     let flac_path = content_directory.join(decode_html_entities(&torrent.file_path).to_string());
@@ -303,6 +279,8 @@ async fn handle_url(
     multi_progress.println("[➡️] Transcoding...").unwrap();
 
     let transcode_directory = cmd.transcode_directory.as_ref().unwrap();
+
+    let base_name = get_base_name(group.clone(), torrent.clone());
 
     for format in &transcode_formats {
         let pb_format = multi_progress.insert_before(&pb_main, ProgressBar::new(flacs_count));
@@ -512,6 +490,32 @@ fn get_transcode_formats(
         .filter(|&release_type| !existing_formats.contains(release_type))
         .cloned()
         .collect()
+}
+fn get_base_name(group: Group, torrent: Torrent) -> String {
+    let artist = if group.music_info.artists.len() > 1 {
+        "Various Artists".to_string()
+    } else {
+        group.music_info.artists[0].name.clone()
+    };
+
+    // Fixes edge case where remaster year is 0 (likely unintentional)
+    let year = if torrent.remaster_year != 0 {
+        torrent.remaster_year
+    } else {
+        group.year
+    };
+
+    let group_name = group.name.replace(":", "");
+
+    let raw_base_name = if torrent.remaster_title.len() > 1 {
+        format!(
+            "{} - {} ({}) [{}]",
+            artist, group_name, torrent.remaster_title, year
+        )
+    } else {
+        format!("{} - {} [{}]", artist, group_name, year)
+    };
+    raw_base_name.replace(&FORBIDDEN_CHARACTERS[..], "_")
 }
 
 async fn create_spectrograms(
