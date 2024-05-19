@@ -425,7 +425,7 @@ fn get_base_name(group: &Group, torrent: &Torrent) -> String {
     let artist = if group.music_info.artists.len() > 1 {
         "Various Artists".to_string()
     } else {
-        group.music_info.artists[0].name.clone()
+        decode_html_entities(&group.music_info.artists[0].name).to_string()
     };
 
     // Fixes edge case where remaster year is 0 (likely unintentional)
@@ -435,12 +435,15 @@ fn get_base_name(group: &Group, torrent: &Torrent) -> String {
         group.year
     };
 
-    let group_name = group.name.replace(":", "");
+    let group_name = decode_html_entities(&group.name)
+        .to_string()
+        .replace(":", "");
 
     let raw_base_name = if torrent.remaster_title.len() > 1 {
+        let remaster_title = decode_html_entities(&torrent.remaster_title).to_string();
         format!(
             "{} - {} ({}) [{}]",
-            artist, group_name, torrent.remaster_title, year
+            artist, group_name, remaster_title, year
         )
     } else {
         format!("{} - {} [{}]", artist, group_name, year)
@@ -635,9 +638,34 @@ async fn transcode_flacs(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::env::current_dir;
     use std::time::SystemTime;
+
+    use crate::redacted::api::model::{Artist, MusicInfo};
+
+    use super::*;
+
+    #[test]
+    fn can_get_base_name() {
+        let group = Group {
+            name: "Album Name 『』你好 💿🎶 ".to_string(),
+            year: 1234,
+            music_info: MusicInfo {
+                artists: vec![Artist {
+                    id: 987654,
+                    name: "Artist&#39;s Name 世界 👥 🗣".to_string(),
+                }],
+            },
+            ..Default::default()
+        };
+        let torrent = Torrent {
+            remaster_year: 5678,
+            remaster_title: "Remaster Title &amp; 重制版 🔊".to_string(),
+            ..Default::default()
+        };
+        let result = get_base_name(&group, &torrent);
+        assert_eq!(result, "Artist's Name 世界 👥 🗣 - Album Name 『』你好 💿🎶  (Remaster Title & 重制版 🔊) [5678]");
+    }
 
     #[test]
     fn get_transcode_formats_from_flac24_skips_existing() {
