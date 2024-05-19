@@ -7,8 +7,8 @@ use crate::redacted::models::ReleaseType::{Flac, Flac24, Mp3320, Mp3V0};
 use crate::redacted::models::{Category, Media, ReleaseType};
 use crate::redacted::upload::TorrentUploadData;
 use crate::redacted::util::{
-    create_description, get_existing_release_types, get_group_id_from_url, get_torrent_id_from_url,
-    perma_link,
+    create_description, get_existing_release_types, get_group_id_from_url, get_release_type,
+    get_torrent_id_from_url, perma_link,
 };
 use crate::tags::util::valid_tags;
 use crate::transcode::transcode::transcode_release;
@@ -22,7 +22,6 @@ use std::collections::HashSet;
 use std::env::temp_dir;
 use std::path::PathBuf;
 use std::sync::Arc;
-use strum::IntoEnumIterator;
 use tokio::fs::create_dir_all;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
@@ -136,12 +135,12 @@ async fn handle_url(
         return Ok(());
     }
 
-    let transcode_formats = get_transcode_formats(
-        existing_formats,
-        &torrent.format,
-        cmd.allowed_transcode_formats,
-        cmd.skip_existing_formats_check,
-    );
+    let transcode_formats = if cmd.skip_existing_formats_check {
+        let source_type = get_release_type(torrent).unwrap();
+        get_transcode_formats(cmd.allowed_transcode_formats, HashSet::from([source_type]))
+    } else {
+        get_transcode_formats(cmd.allowed_transcode_formats, existing_formats)
+    };
 
     if transcode_formats.is_empty() {
         term.write_line(&format!(
@@ -592,33 +591,15 @@ async fn handle_url(
 }
 
 fn get_transcode_formats(
-    existing_formats: HashSet<ReleaseType>,
-    torrent_format: &String,
     allowed_transcode_formats: Vec<ReleaseType>,
-    skip_existing_formats_check: bool,
+    existing_formats: HashSet<ReleaseType>,
 ) -> Vec<ReleaseType> {
-    let mut transcode_formats = Vec::new();
-    ReleaseType::iter().for_each(|release_type| {
-        let format_already_exist = existing_formats.contains(&release_type);
-        let release_is_not_flac_24 = release_type != Flac24;
-        let release_is_allowed_to_transcode = allowed_transcode_formats.contains(&release_type);
-
-        let release_is_not_flac_24_and_allowed_to_transcode =
-            release_is_not_flac_24 && release_is_allowed_to_transcode;
-
-        if skip_existing_formats_check {
-            if release_is_not_flac_24_and_allowed_to_transcode
-                && (release_type != Flac || torrent_format != "FLAC")
-            {
-                transcode_formats.push(release_type);
-            }
-        } else {
-            if !format_already_exist && release_is_not_flac_24_and_allowed_to_transcode {
-                transcode_formats.push(release_type);
-            }
-        }
-    });
-    transcode_formats
+    allowed_transcode_formats
+        .iter()
+        .filter(|&&release_type| release_type != Flac24)
+        .filter(|&release_type| !existing_formats.contains(release_type))
+        .cloned()
+        .collect()
 }
 
 #[cfg(test)]
@@ -626,93 +607,53 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_transcode_formats_from_flac24_skips_exiting() {
+    fn get_transcode_formats_from_flac24_skips_existing() {
+        let allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
         let existing_formats = HashSet::from([Flac24, Mp3320]);
-        let torrent_format = "FLAC".to_string();
-        let allowed_transcode_formats = vec![Mp3320, Mp3V0, Flac];
-        let skip_existing_formats_check = false;
-        let result = get_transcode_formats(
-            existing_formats,
-            &torrent_format,
-            allowed_transcode_formats,
-            skip_existing_formats_check,
-        );
+        let result = get_transcode_formats(allowed_transcode_formats, existing_formats);
         assert_eq!(result, [Flac, Mp3V0]);
     }
 
     #[test]
     fn get_transcode_formats_from_flac_skips_existing() {
+        let allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
         let existing_formats = HashSet::from([Flac, Mp3320]);
-        let torrent_format = "FLAC".to_string();
-        let allowed_transcode_formats = vec![Mp3320, Mp3V0, Flac];
-        let skip_existing_formats_check = false;
-        let result = get_transcode_formats(
-            existing_formats,
-            &torrent_format,
-            allowed_transcode_formats,
-            skip_existing_formats_check,
-        );
+        let result = get_transcode_formats(allowed_transcode_formats, existing_formats);
         assert_eq!(result, [Mp3V0]);
     }
 
     #[test]
     fn get_transcode_formats_from_flac24_without_skips_exiting() {
-        let existing_formats = HashSet::from([Flac24, Mp3320]);
-        let torrent_format = "FLAC".to_string();
-        let allowed_transcode_formats = vec![Mp3320, Mp3V0, Flac];
-        let skip_existing_formats_check = true;
-        let result = get_transcode_formats(
-            existing_formats,
-            &torrent_format,
-            allowed_transcode_formats,
-            skip_existing_formats_check,
-        );
+        let allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
+        let source_format = Flac;
+        let existing_formats = HashSet::from([source_format]);
+        let result = get_transcode_formats(allowed_transcode_formats, existing_formats);
         // TODO: Why is Flac not included?
         assert_eq!(result, [Mp3320, Mp3V0]);
     }
 
     #[test]
     fn get_transcode_formats_from_flac_without_skips_existing() {
-        let existing_formats = HashSet::from([Flac, Mp3320]);
-        let torrent_format = "FLAC".to_string();
-        let allowed_transcode_formats = vec![Mp3320, Mp3V0, Flac];
-        let skip_existing_formats_check = true;
-        let result = get_transcode_formats(
-            existing_formats,
-            &torrent_format,
-            allowed_transcode_formats,
-            skip_existing_formats_check,
-        );
+        let allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
+        let source_format = Flac;
+        let existing_formats = HashSet::from([source_format]);
+        let result = get_transcode_formats(allowed_transcode_formats, existing_formats);
         assert_eq!(result, [Mp3320, Mp3V0]);
     }
 
     #[test]
     fn get_transcode_formats_from_flac_applies_allowed() {
-        let existing_formats = HashSet::from([Flac, Mp3320]);
-        let torrent_format = "FLAC".to_string();
         let allowed_transcode_formats = vec![Mp3320, Mp3V0];
-        let skip_existing_formats_check = false;
-        let result = get_transcode_formats(
-            existing_formats,
-            &torrent_format,
-            allowed_transcode_formats,
-            skip_existing_formats_check,
-        );
+        let existing_formats = HashSet::from([Flac, Mp3320]);
+        let result = get_transcode_formats(allowed_transcode_formats, existing_formats);
         assert_eq!(result, [Mp3V0]);
     }
 
     #[test]
     fn get_transcode_formats_from_flac_applies_allowed_none() {
-        let existing_formats = HashSet::from([Flac, Mp3320]);
-        let torrent_format = "FLAC".to_string();
         let allowed_transcode_formats = vec![Mp3320];
-        let skip_existing_formats_check = false;
-        let result = get_transcode_formats(
-            existing_formats,
-            &torrent_format,
-            allowed_transcode_formats,
-            skip_existing_formats_check,
-        );
+        let existing_formats = HashSet::from([Flac, Mp3320]);
+        let result = get_transcode_formats(allowed_transcode_formats, existing_formats);
         assert_eq!(result, []);
     }
 }

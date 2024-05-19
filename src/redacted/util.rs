@@ -72,7 +72,7 @@ pub fn get_existing_release_types(
         .collect()
 }
 
-fn get_release_type(t: &Torrent) -> Option<ReleaseType> {
+pub fn get_release_type(t: &Torrent) -> Option<ReleaseType> {
     match t.format.as_str() {
         "FLAC" => match t.encoding.as_str() {
             "Lossless" => Some(Flac),
