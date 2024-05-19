@@ -2,11 +2,15 @@ use crate::config::config::apply_config;
 use crate::fs::util::get_all_files_with_extension;
 use crate::redacted::api::client::RedactedApi;
 use crate::redacted::api::constants::{FORBIDDEN_CHARACTERS, TRACKER_URL};
+use crate::redacted::api::model::{Group, Torrent};
 use crate::redacted::api::path::is_path_exceeding_redacted_path_limit;
 use crate::redacted::models::ReleaseType::{Flac, Flac24, Mp3320, Mp3V0};
 use crate::redacted::models::{Category, Media, ReleaseType};
 use crate::redacted::upload::TorrentUploadData;
-use crate::redacted::util::{create_description, perma_link};
+use crate::redacted::util::{
+    create_description, get_bitrate, get_existing_release_types, get_format, get_group_id_from_url,
+    get_permalink, get_release_type, get_torrent_id_from_url,
+};
 use crate::tags::util::valid_tags;
 use crate::transcode::transcode::transcode_release;
 use crate::transcode::util::copy_other_allowed_files;
@@ -15,21 +19,18 @@ use console::Term;
 use dialoguer::{Confirm, Input};
 use html_escape::decode_html_entities;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::collections::HashSet;
 use std::env::temp_dir;
 use std::path::PathBuf;
 use std::sync::Arc;
-use strum::IntoEnumIterator;
 use tokio::fs::create_dir_all;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
-pub async fn transcode(mut cmd: TranscodeCommand, term: &Term) -> anyhow::Result<()> {
-    apply_config(&mut cmd, term).await?;
+pub async fn transcode(cmd: &TranscodeCommand, term: &Term) -> anyhow::Result<()> {
+    let cmd = apply_config(&cmd, term).await?;
 
-    let mut api = RedactedApi::new(cmd.api_key.clone().unwrap())?;
+    let mut api = RedactedApi::new(cmd.api_key.as_ref().unwrap())?;
     let index_response = api.index().await?.response;
 
     term.write_line(&format!(
@@ -37,12 +38,13 @@ pub async fn transcode(mut cmd: TranscodeCommand, term: &Term) -> anyhow::Result
         SUCCESS, index_response.username
     ))?;
 
-    for url in cmd.urls.clone() {
+    let urls = &cmd.urls;
+    for url in urls {
         let result = handle_url(
             url.as_str(),
             term,
             &mut api,
-            cmd.clone(),
+            &cmd,
             index_response.passkey.clone(),
         )
         .await;
@@ -62,30 +64,20 @@ async fn handle_url(
     url: &str,
     term: &Term,
     api: &mut RedactedApi,
-    mut cmd: TranscodeCommand,
+    cmd: &TranscodeCommand,
     passkey: String,
 ) -> anyhow::Result<()> {
-    lazy_static! {
-        static ref REDACTED_PERMA_LINK_REGEX: Regex = regex::Regex::new(
-            r"(https://|http://)?redacted\.ch/torrents\.php\?id=(\d+)&torrentid=(\d+)"
-        )
-        .unwrap();
+    let group_id = get_group_id_from_url(url);
+    let torrent_id = get_torrent_id_from_url(url);
+    if group_id.is_none() || torrent_id.is_none() {
+        term.write_line(&format!(
+            "{} Could not parse permalink {}, please make sure you are using a valid permalink including group id and torrent id",
+            ERROR, url
+        ))?;
+        return Ok(());
     }
-
-    let captures = match REDACTED_PERMA_LINK_REGEX.captures(url) {
-        None => {
-            term.write_line(&format!(
-                "{} Could not parse permalink {}, please make sure you are using a valid permalink including group id and torrent id",
-                ERROR, url
-            ))?;
-            return Ok(());
-        }
-        Some(c) => c,
-    };
-
-    let group_id = captures.get(2).unwrap().as_str().parse::<i64>().unwrap();
-    let torrent_id = captures.get(3).unwrap().as_str().parse::<i64>().unwrap();
-
+    let group_id = group_id.unwrap();
+    let torrent_id = torrent_id.unwrap();
     term.write_line(&format!(
         "{} Got torrent {} from group {}",
         SUCCESS, torrent_id, group_id
@@ -126,85 +118,34 @@ async fn handle_url(
         ))?;
     }
 
-    let mut existing_formats = HashSet::new();
-
-    group_torrents
-        .iter()
-        .filter(|t| t.remaster_title == torrent.remaster_title
-            && t.remaster_record_label == torrent.remaster_record_label
-            && t.media == torrent.media
-            && t.remaster_catalogue_number == torrent.remaster_catalogue_number)
-        .for_each(|t| {
-            match t.format.as_str() {
-                "FLAC" => match t.encoding.as_str() {
-                    "Lossless" => {
-                        existing_formats.insert(Flac);
-                    }
-                    "24bit Lossless" => {
-                        existing_formats.insert(Flac24);
-                    },
-                    _ => {
-                        term.write_line(&format!(
-                            "{} Unknown encoding {} for torrent {} in group {}, this shouldn't happen...",
-                            ERROR, t.encoding, t.id, group_id
-                        )).unwrap();
-                    }
-                },
-                "MP3" => {
-                    match t.encoding.as_str() {
-                        "320" => {
-                            existing_formats.insert(Mp3320);
-                        }
-                        "V0 (VBR)" => {
-                            existing_formats.insert(Mp3V0);
-                        }
-                        _ => {
-                            term.write_line(&format!(
-                                "{} Unknown encoding {} for torrent {} in group {}, this shouldn't happen...",
-                                ERROR, t.encoding, t.id, group_id
-                            )).unwrap();
-                        }
-                    }
-                }
-                _ => {
-                    term.write_line(&format!(
-                        "{} Unknown format {} for torrent {} in group {}, this shouldn't happen...",
-                        ERROR, t.format, t.id, group_id
-                    )).unwrap();
-                }
-            }
-        });
-
-    if !existing_formats.contains(&Flac) && !existing_formats.contains(&Flac24) {
+    let existing_formats = get_existing_release_types(torrent, &group_torrents);
+    if existing_formats.contains(&None) {
         term.write_line(&format!(
-            "{} Torrent {} in group {} has no FLAC base to transcode from... skipping",
-            WARNING, torrent_id, group_id
+            "{} Unknown encoding for torrent {} in group {}, this shouldn't happen...",
+            ERROR, torrent.id, group_id
+        ))
+        .unwrap();
+    }
+    let existing_formats: HashSet<ReleaseType> =
+        existing_formats.into_iter().filter_map(|x| x).collect();
+
+    let source_format = get_release_type(torrent).unwrap();
+    if source_format != Flac24 || source_format != Flac {
+        term.write_line(&format!(
+            "{} Torrent {} in group {} is {} not FLAC... skipping",
+            WARNING, torrent_id, group_id, source_format
         ))?;
         return Ok(());
     }
 
-    let mut transcode_formats = Vec::new();
-
-    ReleaseType::iter().for_each(|release_type| {
-        let format_already_exist = existing_formats.contains(&release_type);
-        let release_is_not_flac_24 = release_type != Flac24;
-        let release_is_allowed_to_transcode = cmd.allowed_transcode_formats.contains(&release_type);
-
-        let release_is_not_flac_24_and_allowed_to_transcode =
-            release_is_not_flac_24 && release_is_allowed_to_transcode;
-
-        if cmd.skip_existing_formats_check {
-            if release_is_not_flac_24_and_allowed_to_transcode
-                && (release_type != Flac || torrent.format != "FLAC")
-            {
-                transcode_formats.push(release_type);
-            }
-        } else {
-            if !format_already_exist && release_is_not_flac_24_and_allowed_to_transcode {
-                transcode_formats.push(release_type);
-            }
-        }
-    });
+    let transcode_formats = if cmd.skip_existing_formats_check {
+        get_transcode_formats(
+            &cmd.allowed_transcode_formats,
+            HashSet::from([source_format]),
+        )
+    } else {
+        get_transcode_formats(&cmd.allowed_transcode_formats, existing_formats)
+    };
 
     if transcode_formats.is_empty() {
         term.write_line(&format!(
@@ -225,32 +166,7 @@ async fn handle_url(
         group_id
     ))?;
 
-    let artist = if group.music_info.artists.len() > 1 {
-        "Various Artists".to_string()
-    } else {
-        group.music_info.artists[0].name.clone()
-    };
-
-    let mut year = torrent.remaster_year;
-
-    // Fixes edge case where remaster year is 0 (likely unintentional)
-    if year == 0 {
-        year = group.year;
-    }
-
-    let group_name = group.name.replace(":", "");
-
-    let raw_base_name = if torrent.remaster_title.len() > 1 {
-        format!(
-            "{} - {} ({}) [{}]",
-            artist, group_name, torrent.remaster_title, year
-        )
-    } else {
-        format!("{} - {} [{}]", artist, group_name, year)
-    };
-    let base_name = raw_base_name.replace(&FORBIDDEN_CHARACTERS[..], "_");
-
-    let content_directory = cmd.content_directory.unwrap();
+    let content_directory = cmd.content_directory.as_ref().unwrap();
 
     let flac_path = content_directory.join(decode_html_entities(&torrent.file_path).to_string());
 
@@ -258,12 +174,12 @@ async fn handle_url(
 
     let (valid, invalid_track_number_vinyl) = valid_tags(&flac_path, &media).await?;
 
+    let mut manual_upload_required = false;
     if !valid && invalid_track_number_vinyl {
         term.write_line(&format!(
             "{} Release is Vinyl and has either no set track number or in a non standard format (e.g. A1, A2 etc), you will be prompted once transcode is done to manually check & adjust the transcode tags as needed!", WARNING
         ))?;
-
-        cmd.automatic_upload = false;
+        manual_upload_required = true;
     } else if !valid {
         term.write_line(&format!(
             "{} Torrent {} in group {} has FLAC files with invalid tags, skipping...\n You might be able to trump it.",
@@ -302,95 +218,24 @@ async fn handle_url(
         tokio::fs::remove_file(&tmp).await?;
     }
 
-    let spectrogram_directory = cmd.spectrogram_directory.unwrap();
     let flacs = get_all_files_with_extension(&flac_path, ".flac").await?;
-    let flacs_count = flacs.len();
+    let flacs_count = flacs.len() as u64;
 
     if !cmd.skip_spectrogram {
-        let pb = ProgressBar::new(flacs_count as u64);
-
-        pb.set_style(
-            ProgressStyle::with_template(
-                "[{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos:>7}/{len:7} File(s)",
-            )?
-            .progress_chars("#>-"),
-        );
-
-        pb.set_message("Creating Spectrograms... (This may take a while)");
-
-        let parent = flac_path.file_name().unwrap().to_str().unwrap();
-        let to_create = spectrogram_directory.join(parent);
-
-        create_dir_all(&to_create).await?;
-
-        let semaphore = Arc::new(Semaphore::new(cmd.concurrency.unwrap()));
-        let mut tasks = vec![];
-
-        for flac in flacs {
-            let semaphore = Arc::clone(&semaphore);
-            let spectrogram_directory = spectrogram_directory.clone();
-            let flac_path = flac_path.clone();
-            let flac = flac.clone();
-            let pb = pb.clone();
-            tasks.push(tokio::spawn(async move {
-                let mut join_set = JoinSet::new();
-
-                let semaphore_clone = Arc::clone(&semaphore);
-                let spectrogram_directory_clone = spectrogram_directory.clone();
-                let flac_path_clone = flac_path.clone();
-                let flac_clone = flac.clone();
-
-                join_set.spawn(async move {
-                    let _permit = semaphore_clone.acquire().await.unwrap();
-
-                    spectrogram::spectrogram::make_spectrogram_zoom(
-                        &flac_path_clone,
-                        &flac_clone,
-                        &spectrogram_directory_clone,
-                    )
-                    .await?;
-
-                    Ok::<(), anyhow::Error>(())
-                });
-
-                let semaphore_clone = Arc::clone(&semaphore);
-                let spectrogram_directory_clone = spectrogram_directory.clone();
-                let flac_path_clone = flac_path.clone();
-                let flac_clone = flac.clone();
-                join_set.spawn(async move {
-                    let _permit = semaphore_clone.acquire().await.unwrap();
-
-                    spectrogram::spectrogram::make_spectrogram_full(
-                        &flac_path_clone,
-                        &flac_clone,
-                        &spectrogram_directory_clone,
-                    )
-                    .await?;
-
-                    Ok::<(), anyhow::Error>(())
-                });
-
-                while let Some(result) = join_set.join_next().await {
-                    result??;
-                }
-
-                pb.inc(1);
-
-                Ok::<(), anyhow::Error>(())
-            }));
+        let spectrogram_directory = cmd.spectrogram_directory.as_ref().unwrap();
+        let concurrency = cmd.concurrency.unwrap();
+        let result =
+            create_spectrograms(&flacs, &flac_path, spectrogram_directory, concurrency).await;
+        if result.is_err() {
+            return Ok(());
         }
 
-        for task in tasks {
-            task.await??;
-        }
+        term.write_line(&*format!(
+            "{} Created Spectrograms at {}, please manual check if FLAC is lossless before continuing!",
+            PAUSE, spectrogram_directory.to_str().unwrap()
+        ))?;
 
-        let mut prompt = Confirm::new();
-
-        pb.finish_and_clear();
-
-        term.write_line(&*format!("{} Created Spectrograms at {}, please manual check if FLAC is lossless before continuing!", PAUSE, to_create.to_str().unwrap()))?;
-
-        prompt = prompt
+        let prompt = Confirm::new()
             .with_prompt("Do those spectrograms look good?")
             .default(true);
 
@@ -402,7 +247,7 @@ async fn handle_url(
                 ERROR, torrent_id, group_id
             ))?;
             return Ok(());
-        }
+        };
     }
 
     if transcode::util::is_multichannel(&flac_path).await? {
@@ -413,6 +258,298 @@ async fn handle_url(
         return Ok(());
     }
 
+    if invalid_track_number_vinyl {
+        let mut prompt = Confirm::new();
+
+        prompt = prompt
+            .with_prompt(format!("{} Please check tags of trancoded media and adjust as needed (release is vinyl and has either no track number or in an non standard format e.g. A1, A2 etc which the audiotags library used can't parse), continue?", WARNING))
+            .default(true);
+
+        prompt.interact()?;
+    }
+
+    let transcode_directory = cmd.transcode_directory.as_ref().unwrap();
+    let base_name = get_base_name(&group, torrent);
+
+    let path_format_command_triple = transcode_flacs(
+        flacs_count,
+        &transcode_formats,
+        &flac_path,
+        transcode_directory,
+        base_name,
+        torrent_id,
+        &torrent.media,
+        cmd.concurrency.unwrap(),
+        term,
+    )
+    .await?;
+
+    let torrent_directory = cmd.torrent_directory.as_ref().unwrap();
+
+    for (path, format, command) in &path_format_command_triple {
+        let release_name = path.file_name().unwrap().to_str().unwrap();
+        let mut exceeds_red_path_length = is_path_exceeding_redacted_path_limit(&path).await?;
+
+        while exceeds_red_path_length {
+            let editor = Input::new();
+
+            let edited_text = editor
+                .with_prompt(format!(
+                    "{} Folder Name {} is too long for RED, please shorten the folder name\n",
+                    ERROR, release_name
+                ))
+                .default(release_name.to_string())
+                .interact_text()?;
+
+            let new_path = path.parent().unwrap().join(edited_text);
+            exceeds_red_path_length = is_path_exceeding_redacted_path_limit(&new_path).await?;
+        }
+
+        let torrent_path = torrent_directory.join(release_name.to_owned() + ".torrent");
+
+        imdl::torrent::create_torrent(
+            path,
+            &torrent_path,
+            format!("{}/{}/announce", TRACKER_URL, passkey),
+        )
+        .await?;
+
+        term.write_line(&format!(
+            "{} Created .torrent files for format {}",
+            SUCCESS, format
+        ))?;
+
+        let torrent_file_data = tokio::fs::read(&torrent_path).await?;
+
+        if cmd.move_transcode_to_content {
+            tokio::fs::rename(&path, &content_directory.join(path.file_name().unwrap())).await?;
+
+            term.write_line(&format!(
+                "{} Moved transcode release to content directory",
+                SUCCESS,
+            ))?;
+        }
+
+        if !cmd.automatic_upload || manual_upload_required {
+            term.write_line(&*format!(
+                "{} Manual mode enabled, skipping automatic upload",
+                PAUSE
+            ))?;
+            term.write_line(&format!("Link: {}", get_permalink(group_id, torrent_id)))?;
+            term.write_line(&format!("Name: {}", group.name))?;
+            term.write_line(&format!(
+                "Artist(s): {}",
+                group
+                    .music_info
+                    .artists
+                    .iter()
+                    .map(|a| a.name.clone())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ))?;
+            term.write_line(&format!("Edition Year: {}", torrent.remaster_year))?;
+            term.write_line(&format!("Edition Title: {}", torrent.remaster_title))?;
+            term.write_line(&format!("Record Label: {}", torrent.remaster_record_label))?;
+            term.write_line(&format!(
+                "Catalogue Number: {}",
+                torrent.remaster_catalogue_number
+            ))?;
+            term.write_line(&format!(
+                "Scene: {}",
+                if torrent.scene { "Yes" } else { "No" }
+            ))?;
+            term.write_line(&format!("Format: {}", get_format(format)))?;
+            term.write_line(&format!("Bitrate: {}", get_bitrate(format)))?;
+            term.write_line(&format!("Media: {}", torrent.media))?;
+            term.write_line("Release Description:")?;
+            term.write_line(
+                create_description(get_permalink(group_id, torrent_id), command).as_str(),
+            )?;
+
+            let mut prompt = Confirm::new();
+
+            prompt = prompt
+                .with_prompt("Confirm once you are done uploading...")
+                .default(true);
+
+            prompt.interact()?;
+        } else if !cmd.dry_run {
+            let year = if torrent.remaster_year == 0 {
+                group.year
+            } else {
+                torrent.remaster_year
+            };
+
+            let upload_data = TorrentUploadData {
+                torrent: torrent_file_data,
+                torrent_name: torrent_path
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                r#type: Category::from(&*group.category_name),
+                remaster_year: year,
+                remaster_title: torrent.remaster_title.clone(),
+                remaster_record_label: torrent.remaster_record_label.clone(),
+                remaster_catalogue_number: torrent.remaster_catalogue_number.clone(),
+                format: get_format(format),
+                bitrate: get_bitrate(format),
+                media: torrent.media.clone(),
+                release_desc: create_description(get_permalink(group_id, torrent_id), command),
+                group_id: group.id as u64,
+            };
+
+            let res = api.upload_torrent(upload_data).await?;
+
+            term.write_line(&format!("[🔼] Uploaded {} release to REDacted https://redacted.ch/torrents.php?id={}&torrentid={}", format, group_id, res.response.torrent_id))?;
+        }
+    }
+
+    Ok(())
+}
+
+fn get_transcode_formats(
+    allowed_transcode_formats: &Vec<ReleaseType>,
+    existing_formats: HashSet<ReleaseType>,
+) -> Vec<ReleaseType> {
+    allowed_transcode_formats
+        .iter()
+        .filter(|&&release_type| release_type != Flac24)
+        .filter(|&release_type| !existing_formats.contains(release_type))
+        .cloned()
+        .collect()
+}
+
+fn get_base_name(group: &Group, torrent: &Torrent) -> String {
+    let artist = if group.music_info.artists.len() > 1 {
+        "Various Artists".to_string()
+    } else {
+        decode_html_entities(&group.music_info.artists[0].name).to_string()
+    };
+
+    // Fixes edge case where remaster year is 0 (likely unintentional)
+    let year = if torrent.remaster_year != 0 {
+        torrent.remaster_year
+    } else {
+        group.year
+    };
+
+    let group_name = decode_html_entities(&group.name)
+        .to_string()
+        .replace(":", "");
+
+    let raw_base_name = if torrent.remaster_title.len() > 1 {
+        let remaster_title = decode_html_entities(&torrent.remaster_title).to_string();
+        format!(
+            "{} - {} ({}) [{}]",
+            artist, group_name, remaster_title, year
+        )
+    } else {
+        format!("{} - {} [{}]", artist, group_name, year)
+    };
+    raw_base_name.replace(&FORBIDDEN_CHARACTERS[..], "_")
+}
+
+async fn create_spectrograms(
+    flacs: &Vec<PathBuf>,
+    flac_path: &PathBuf,
+    spectrogram_directory: &PathBuf,
+    concurrency: usize,
+) -> anyhow::Result<()> {
+    let pb = ProgressBar::new(flacs.len() as u64);
+
+    pb.set_style(
+        ProgressStyle::with_template(
+            "[{elapsed_precise}] [{bar:40.cyan/blue}] {msg} {pos:>7}/{len:7} File(s)",
+        )?
+        .progress_chars("#>-"),
+    );
+
+    pb.set_message("Creating Spectrograms... (This may take a while)");
+
+    let parent = flac_path.file_name().unwrap().to_str().unwrap();
+    let to_create = spectrogram_directory.join(parent);
+
+    create_dir_all(&to_create).await?;
+
+    let semaphore = Arc::new(Semaphore::new(concurrency));
+    let mut tasks = vec![];
+
+    for flac in flacs {
+        let semaphore = Arc::clone(&semaphore);
+        let spectrogram_directory = spectrogram_directory.clone();
+        let flac_path = flac_path.clone();
+        let flac = flac.clone();
+        let pb = pb.clone();
+        tasks.push(tokio::spawn(async move {
+            let mut join_set = JoinSet::new();
+
+            let semaphore_clone = Arc::clone(&semaphore);
+            let spectrogram_directory_clone = spectrogram_directory.clone();
+            let flac_path_clone = flac_path.clone();
+            let flac_clone = flac.clone();
+
+            join_set.spawn(async move {
+                let _permit = semaphore_clone.acquire().await.unwrap();
+
+                spectrogram::spectrogram::make_spectrogram_zoom(
+                    &flac_path_clone,
+                    &flac_clone,
+                    &spectrogram_directory_clone,
+                )
+                .await?;
+
+                Ok::<(), anyhow::Error>(())
+            });
+
+            let semaphore_clone = Arc::clone(&semaphore);
+            let spectrogram_directory_clone = spectrogram_directory.clone();
+            let flac_path_clone = flac_path.clone();
+            let flac_clone = flac.clone();
+            join_set.spawn(async move {
+                let _permit = semaphore_clone.acquire().await.unwrap();
+
+                spectrogram::spectrogram::make_spectrogram_full(
+                    &flac_path_clone,
+                    &flac_clone,
+                    &spectrogram_directory_clone,
+                )
+                .await?;
+
+                Ok::<(), anyhow::Error>(())
+            });
+
+            while let Some(result) = join_set.join_next().await {
+                result??;
+            }
+
+            pb.inc(1);
+
+            Ok::<(), anyhow::Error>(())
+        }));
+    }
+
+    for task in tasks {
+        task.await??;
+    }
+
+    pb.finish_and_clear();
+
+    return Ok(());
+}
+
+async fn transcode_flacs(
+    flacs_count: u64,
+    transcode_formats: &Vec<ReleaseType>,
+    flac_path: &PathBuf,
+    transcode_directory: &PathBuf,
+    base_name: String,
+    torrent_id: i64,
+    media: &String,
+    concurrency: usize,
+    term: &Term,
+) -> anyhow::Result<Vec<(PathBuf, ReleaseType, String)>> {
     let multi_progress = MultiProgress::with_draw_target(ProgressDrawTarget::stdout());
     let sty = ProgressStyle::with_template(
         "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
@@ -421,23 +558,20 @@ async fn handle_url(
     .progress_chars("##-");
 
     let pb_main = multi_progress.add(ProgressBar::new(
-        (flacs_count * transcode_formats.len()) as u64,
+        flacs_count * transcode_formats.len() as u64,
     ));
     pb_main.set_style(sty.clone());
     pb_main.set_message("Total");
 
     pb_main.tick();
 
-    let semaphore = Arc::new(Semaphore::new(cmd.concurrency.unwrap()));
+    let semaphore = Arc::new(Semaphore::new(concurrency));
     let mut join_set = JoinSet::new();
 
     multi_progress.println("[➡️] Transcoding...").unwrap();
 
-    let transcode_directory = cmd.transcode_directory.unwrap();
-
-    for format in &transcode_formats {
-        let pb_format =
-            multi_progress.insert_before(&pb_main, ProgressBar::new(flacs_count as u64));
+    for format in transcode_formats {
+        let pb_format = multi_progress.insert_before(&pb_main, ProgressBar::new(flacs_count));
         pb_format.set_style(sty.clone());
 
         let transcode_format_str = match format {
@@ -450,7 +584,7 @@ async fn handle_url(
         let transcode_release_name = format!(
             "{} ({} - {})",
             base_name,
-            torrent.media.to_uppercase(),
+            media.to_uppercase(),
             transcode_format_str
         );
 
@@ -499,157 +633,187 @@ async fn handle_url(
     multi_progress.println(format!("{} Transcoding Done!", SUCCESS))?;
     multi_progress.clear()?;
 
-    if invalid_track_number_vinyl {
-        let mut prompt = Confirm::new();
+    Ok(path_format_command_triple)
+}
 
-        prompt = prompt
-            .with_prompt(format!("{} Please check tags of trancoded media and adjust as needed (release is vinyl and has either no track number or in an non standard format e.g. A1, A2 etc which the audiotags library used can't parse), continue?", WARNING))
-            .default(true);
+#[cfg(test)]
+mod tests {
+    use std::env::current_dir;
+    use std::time::SystemTime;
 
-        prompt.interact()?;
+    use crate::redacted::api::model::{Artist, MusicInfo};
+
+    use super::*;
+
+    #[test]
+    fn can_get_base_name() {
+        let group = Group {
+            name: "Album Name 『』你好 💿🎶 ".to_string(),
+            year: 1234,
+            music_info: MusicInfo {
+                artists: vec![Artist {
+                    id: 987654,
+                    name: "Artist&#39;s Name 世界 👥 🗣".to_string(),
+                }],
+            },
+            ..Default::default()
+        };
+        let torrent = Torrent {
+            remaster_year: 5678,
+            remaster_title: "Remaster Title &amp; 重制版 🔊".to_string(),
+            ..Default::default()
+        };
+        let result = get_base_name(&group, &torrent);
+        assert_eq!(result, "Artist's Name 世界 👥 🗣 - Album Name 『』你好 💿🎶  (Remaster Title & 重制版 🔊) [5678]");
     }
 
-    let torrent_directory = cmd.torrent_directory.unwrap();
+    #[test]
+    fn get_transcode_formats_from_flac24_skips_existing() {
+        let allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
+        let existing_formats = HashSet::from([Flac24, Mp3320]);
+        let result = get_transcode_formats(&allowed_transcode_formats, existing_formats);
+        assert_eq!(result, [Flac, Mp3V0]);
+    }
 
-    for (path, format, command) in &path_format_command_triple {
-        let release_name = path.file_name().unwrap().to_str().unwrap();
-        let mut exceeds_red_path_length = is_path_exceeding_redacted_path_limit(&path).await?;
+    #[test]
+    fn get_transcode_formats_from_flac_skips_existing() {
+        let allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
+        let existing_formats = HashSet::from([Flac, Mp3320]);
+        let result = get_transcode_formats(&allowed_transcode_formats, existing_formats);
+        assert_eq!(result, [Mp3V0]);
+    }
 
-        while exceeds_red_path_length {
-            let editor = Input::new();
+    #[test]
+    fn get_transcode_formats_from_flac24_without_skips_exiting() {
+        let allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
+        let source_format = Flac;
+        let existing_formats = HashSet::from([source_format]);
+        let result = get_transcode_formats(&allowed_transcode_formats, existing_formats);
+        // TODO: Why is Flac not included?
+        assert_eq!(result, [Mp3320, Mp3V0]);
+    }
 
-            let edited_text = editor
-                .with_prompt(format!(
-                    "{} Folder Name {} is too long for RED, please shorten the folder name\n",
-                    ERROR, release_name
-                ))
-                .default(release_name.to_string())
-                .interact_text()?;
+    #[test]
+    fn get_transcode_formats_from_flac_without_skips_existing() {
+        let allowed_transcode_formats = vec![Flac, Mp3320, Mp3V0];
+        let source_format = Flac;
+        let existing_formats = HashSet::from([source_format]);
+        let result = get_transcode_formats(&allowed_transcode_formats, existing_formats);
+        assert_eq!(result, [Mp3320, Mp3V0]);
+    }
 
-            let new_path = path.parent().unwrap().join(edited_text);
-            exceeds_red_path_length = is_path_exceeding_redacted_path_limit(&new_path).await?;
-        }
+    #[test]
+    fn get_transcode_formats_from_flac_applies_allowed() {
+        let allowed_transcode_formats = vec![Mp3320, Mp3V0];
+        let existing_formats = HashSet::from([Flac, Mp3320]);
+        let result = get_transcode_formats(&allowed_transcode_formats, existing_formats);
+        assert_eq!(result, [Mp3V0]);
+    }
 
-        let torrent_path = torrent_directory.join(release_name.to_owned() + ".torrent");
+    #[test]
+    fn get_transcode_formats_from_flac_applies_allowed_none() {
+        let allowed_transcode_formats = vec![Mp3320];
+        let existing_formats = HashSet::from([Flac, Mp3320]);
+        let result = get_transcode_formats(&allowed_transcode_formats, existing_formats);
+        assert_eq!(result, []);
+    }
 
-        imdl::torrent::create_torrent(
-            path,
-            &torrent_path,
-            format!("{}/{}/announce", TRACKER_URL, passkey),
+    #[tokio::test]
+    async fn create_spectrograms_test() {
+        let flac_path = get_flacs_sample_dir();
+        let flacs = get_flacs(&flac_path);
+        let hello = current_dir().unwrap();
+        println!("Current dir: {}", hello.to_str().unwrap());
+        let output_dir = get_temp_dir("spectrograms");
+        let concurrency = num_cpus::get();
+        let result = create_spectrograms(&flacs, &flac_path, &output_dir, concurrency).await;
+        assert!(result.is_ok());
+        let generated_files: Vec<PathBuf> = read_dir_recursive(&output_dir);
+        assert_eq!(generated_files.len(), flacs.len() * 2);
+    }
+
+    #[tokio::test]
+    async fn transcode_flacs_test() {
+        let flac_path = get_flacs_sample_dir();
+        let flacs_count = get_flacs(&flac_path).len() as u64;
+        let transcode_formats = vec![Mp3320, Mp3V0];
+        let output_dir = create_temp_dir("transcodes");
+        let base_name = "Hello World".to_string();
+        let torrent_id = 123456;
+        let media = "WEB".to_string();
+        let concurrency = num_cpus::get();
+        let term = Term::stdout();
+        let result = transcode_flacs(
+            flacs_count,
+            &transcode_formats,
+            &flac_path,
+            &output_dir,
+            base_name,
+            torrent_id,
+            &media,
+            concurrency,
+            &term,
         )
-        .await?;
-
-        term.write_line(&format!(
-            "{} Created .torrent files for format {}",
-            SUCCESS, format
-        ))?;
-
-        let torrent_file_data = tokio::fs::read(&torrent_path).await?;
-
-        let perma_link = perma_link(group_id, torrent_id);
-        let description = create_description(perma_link.clone(), command.clone());
-
-        let format_red = match format {
-            Flac24 => "FLAC",
-            Flac => "FLAC",
-            Mp3320 => "MP3",
-            Mp3V0 => "MP3",
-        };
-
-        let bitrate = match format {
-            Flac24 => "24bit Lossless".to_string(),
-            Flac => "Lossless".to_string(),
-            Mp3320 => "320".to_string(),
-            Mp3V0 => "V0 (VBR)".to_string(),
-        };
-
-        if cmd.move_transcode_to_content {
-            tokio::fs::rename(&path, &content_directory.join(path.file_name().unwrap())).await?;
-
-            term.write_line(&format!(
-                "{} Moved transcode release to content directory",
-                SUCCESS,
-            ))?;
-        }
-
-        if !cmd.automatic_upload {
-            term.write_line(&*format!(
-                "{} Manual mode enabled, skipping automatic upload",
-                PAUSE
-            ))?;
-
-            let scene = if torrent.scene { "Yes" } else { "No" };
-            let format = match format {
-                Flac24 => "FLAC",
-                Flac => "FLAC",
-                Mp3320 => "MP3",
-                Mp3V0 => "MP3",
-            };
-
-            term.write_line(&*("Link: ".to_owned() + &*perma_link))?;
-            term.write_line(&*("Name: ".to_owned() + &*group.name.clone()))?;
-            term.write_line(
-                &*("Artist(s): ".to_owned()
-                    + &group
-                        .music_info
-                        .artists
-                        .iter()
-                        .map(|a| a.name.clone())
-                        .collect::<Vec<String>>()
-                        .join(", ")),
-            )?;
-            term.write_line(&*("Edition Year: ".to_owned() + &*torrent.remaster_year.to_string()))?;
-            term.write_line(&*("Edition Title: ".to_owned() + &torrent.remaster_title))?;
-            term.write_line(&*("Record Label: ".to_owned() + &torrent.remaster_record_label))?;
-            term.write_line(
-                &*("Catalogue Number: ".to_owned() + &torrent.remaster_catalogue_number),
-            )?;
-            term.write_line(&*("Scene: ".to_owned() + scene))?;
-            term.write_line(&*("Format: ".to_owned() + format))?;
-            term.write_line(&*("Bitrate: ".to_owned() + &bitrate))?;
-            term.write_line(&*("Media: ".to_owned() + &torrent.media))?;
-            term.write_line("Release Description:")?;
-            term.write_line(&description)?;
-
-            let mut prompt = Confirm::new();
-
-            prompt = prompt
-                .with_prompt("Confirm once you are done uploading...")
-                .default(true);
-
-            prompt.interact()?;
-        } else if !cmd.dry_run {
-            let year = if torrent.remaster_year == 0 {
-                group.year
-            } else {
-                torrent.remaster_year
-            };
-
-            let upload_data = TorrentUploadData {
-                torrent: torrent_file_data,
-                torrent_name: torrent_path
-                    .file_name()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
-                r#type: Category::from(&*group.category_name),
-                remaster_year: year,
-                remaster_title: torrent.remaster_title.clone(),
-                remaster_record_label: torrent.remaster_record_label.clone(),
-                remaster_catalogue_number: torrent.remaster_catalogue_number.clone(),
-                format: format_red.to_string(),
-                bitrate: bitrate.clone(),
-                media: torrent.media.clone(),
-                release_desc: description.clone(),
-                group_id: group.id as u64,
-            };
-
-            let res = api.upload_torrent(upload_data).await?;
-
-            term.write_line(&format!("[🔼] Uploaded {} release to REDacted https://redacted.ch/torrents.php?id={}&torrentid={}", format, group_id, res.response.torrent_id))?;
-        }
+        .await
+        .unwrap();
+        let expected_count = flacs_count as usize * transcode_formats.len();
+        assert_eq!(result.len(), 2);
+        let generated_files: Vec<PathBuf> = read_dir_recursive(&output_dir)
+            .into_iter()
+            .filter(|path| path.extension().unwrap_or_default() == "mp3")
+            .collect();
+        assert_eq!(generated_files.len(), expected_count);
     }
 
-    Ok(())
+    fn get_flacs_sample_dir() -> PathBuf {
+        std::fs::read_dir("samples/flacs")
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path.is_dir())
+            .nth(0)
+            .unwrap()
+    }
+
+    fn get_flacs(flac_path: &PathBuf) -> Vec<PathBuf> {
+        // Get the content
+        let files: Vec<PathBuf> = std::fs::read_dir(flac_path)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path.extension().unwrap_or_default() == "flac")
+            .collect();
+        if files.len() == 0 {
+            panic!("No flac files found in the sample directory");
+        }
+        return files;
+    }
+
+    fn read_dir_recursive(directory_path: &PathBuf) -> Vec<PathBuf> {
+        std::fs::read_dir(directory_path)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .map(|entry| {
+                if entry.is_dir() {
+                    read_dir_recursive(&entry)
+                } else {
+                    vec![entry]
+                }
+            })
+            .flatten()
+            .collect()
+    }
+
+    fn get_temp_dir(sub_dir_name: &str) -> PathBuf {
+        let timestamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            .to_string();
+        temp_dir().join(sub_dir_name).join(timestamp)
+    }
+
+    fn create_temp_dir(sub_dir_name: &str) -> PathBuf {
+        let dir = get_temp_dir(sub_dir_name);
+        std::fs::create_dir_all(&dir).unwrap();
+        return dir;
+    }
 }

@@ -145,7 +145,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     match cli.command {
-        Commands::Transcode(cmd) => command::transcode::transcode(cmd, &term).await?,
+        Commands::Transcode(cmd) => command::transcode::transcode(&cmd, &term).await?,
         Commands::SelfUpdate(_cmd) => self_update::self_update(&term, &mut github).await?,
     }
 
