@@ -23,7 +23,7 @@ impl Into<Form> for TorrentUploadData {
     fn into(self) -> Form {
         let torrent_part = Part::bytes(self.torrent).file_name(self.torrent_name);
 
-        return Form::new()
+        Form::new()
             .part("file_input", torrent_part)
             .text("type", self.r#type.as_int().to_string())
             .text("remaster_title", self.remaster_title)
@@ -34,6 +34,6 @@ impl Into<Form> for TorrentUploadData {
             .text("bitrate", self.bitrate)
             .text("media", self.media)
             .text("release_desc", self.release_desc)
-            .text("groupid", self.group_id.to_string());
+            .text("groupid", self.group_id.to_string())
     }
 }
