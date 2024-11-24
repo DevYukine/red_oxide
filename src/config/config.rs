@@ -77,6 +77,10 @@ fn get_config_path_from_default_location_by_env(env: &str) -> Option<PathBuf> {
 
 #[cfg(target_os = "windows")]
 fn get_home_env() -> Option<String> {
+    use crate::config::constants::WINDOWS_HOMEDRIVE_ENV;
+    use crate::config::constants::WINDOWS_HOMEPATH_ENV;
+    use crate::config::constants::WINDOWS_USERPROFILE_ENV;
+
     if let Ok(home) = env::var(HOME_ENV) {
         return Some(home);
     }
