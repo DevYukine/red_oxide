@@ -49,6 +49,7 @@ impl RedactedApi {
             .await;
     }
 
+    #[allow(dead_code)]
     pub async fn get_torrent_info(
         &mut self,
         torrent_id: i64,
