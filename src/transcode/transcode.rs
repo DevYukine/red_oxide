@@ -52,7 +52,7 @@ pub async fn transcode_release(
         }
     }
 
-    fs::create_dir(&output_dir).await?;
+    fs::create_dir_all(&output_dir).await?;
 
     let paths = get_all_files_with_extension(&flac_dir, ".flac").await?;
 

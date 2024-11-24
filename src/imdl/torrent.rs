@@ -25,6 +25,10 @@ pub async fn create_torrent(
     if output.status.success() {
         Ok(())
     } else {
-        Err(anyhow::anyhow!("Failed to create torrent"))
+        let output_info = match String::from_utf8(output.stderr) {
+            Ok(string) => string,
+            Err(..) => "<failed to load command output>".to_string()
+        };
+        Err(anyhow::anyhow!(format!("Failed to create torrent: {}", output_info)))
     }
 }
