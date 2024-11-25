@@ -1,3 +1,12 @@
+## [0.9.1](https://github.com/DevYukine/red_oxide/compare/v0.9.0...v0.9.1) (2024-11-25)
+
+
+### Bug Fixes
+
+* **transcode:** update new RED Url for PL regex ([d93f70c](https://github.com/DevYukine/red_oxide/commit/d93f70c559f2b9271a7059fbdfa4da81298da97e))
+
+
+
 # [0.9.0](https://github.com/DevYukine/red_oxide/compare/v0.8.2...v0.9.0) (2024-11-24)
 
 
@@ -48,15 +57,6 @@
 ### Features
 
 * add default paths for config file ([c823b08](https://github.com/DevYukine/red_oxide/commit/c823b08239a4aa7c4dbf212c021518f51a0224f0))
-
-
-
-## [0.7.2](https://github.com/DevYukine/red_oxide/compare/v0.7.1...v0.7.2) (2024-01-15)
-
-
-### Bug Fixes
-
-* **ci:** set missing job output ([2334236](https://github.com/DevYukine/red_oxide/commit/2334236fe368d187f0320074e305e522208134bf))
 
 
 
