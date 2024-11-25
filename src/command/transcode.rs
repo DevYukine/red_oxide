@@ -67,7 +67,7 @@ async fn handle_url(
 ) -> anyhow::Result<()> {
     lazy_static! {
         static ref REDACTED_PERMA_LINK_REGEX: Regex = regex::Regex::new(
-            r"(https://|http://)?redacted\.ch/torrents\.php\?id=(\d+)&torrentid=(\d+)"
+            r"(https://|http://)?redacted\.sh/torrents\.php\?id=(\d+)&torrentid=(\d+)"
         )
         .unwrap();
     }
