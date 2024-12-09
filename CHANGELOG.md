@@ -1,3 +1,12 @@
+## [0.9.2](https://github.com/DevYukine/red_oxide/compare/v0.9.1...v0.9.2) (2024-12-09)
+
+
+### Bug Fixes
+
+* **api:** fix outdated urls ([#33](https://github.com/DevYukine/red_oxide/issues/33)) ([273c5ea](https://github.com/DevYukine/red_oxide/commit/273c5ea835a713f1c477bcb1cd59486dc6f42dc7))
+
+
+
 ## [0.9.1](https://github.com/DevYukine/red_oxide/compare/v0.9.0...v0.9.1) (2024-11-25)
 
 
@@ -41,22 +50,6 @@
 
 * **redacted:** minimalize url bbcode to improve integration with other tools ([6a0ac4b](https://github.com/DevYukine/red_oxide/commit/6a0ac4bfc0b3d58e19f671dc2075444491b50c44))
 * **spectrogram:** use correct error message for failing to create spectrogram ([132aac3](https://github.com/DevYukine/red_oxide/commit/132aac347d2e6c670d822fd3c0ab97a4e40441f8))
-
-
-
-# [0.8.0](https://github.com/DevYukine/red_oxide/compare/v0.7.2...v0.8.0) (2024-01-16)
-
-
-### Bug Fixes
-
-* **config:** use correct HOME_ENV constant ([ee3584a](https://github.com/DevYukine/red_oxide/commit/ee3584aeaa6b520959c4d466fc5d3bb5f3c0f5e5))
-* **transcode:** do not drop reference while borrowed ([00c3ffd](https://github.com/DevYukine/red_oxide/commit/00c3ffda9fbbc7fbf0551b70dbf045b3e593db1a))
-* **transcode:** fallback if no extension exists ([346e3d3](https://github.com/DevYukine/red_oxide/commit/346e3d3d0c09d66feda1178012a8153f4bb226ab))
-
-
-### Features
-
-* add default paths for config file ([c823b08](https://github.com/DevYukine/red_oxide/commit/c823b08239a4aa7c4dbf212c021518f51a0224f0))
 
 
 
