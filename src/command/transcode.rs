@@ -647,7 +647,7 @@ async fn handle_url(
 
             let res = api.upload_torrent(upload_data).await?;
 
-            term.write_line(&format!("[🔼] Uploaded {} release to REDacted https://redacted.ch/torrents.php?id={}&torrentid={}", format, group_id, res.response.torrent_id))?;
+            term.write_line(&format!("[🔼] Uploaded {} release to REDacted https://redacted.sh/torrents.php?id={}&torrentid={}", format, group_id, res.response.torrent_id))?;
         }
     }
 
